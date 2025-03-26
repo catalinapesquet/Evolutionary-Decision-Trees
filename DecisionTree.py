@@ -6,7 +6,12 @@ Created on Tue Mar 25 11:22:30 2025
 """
 
 # DecisionTree 
-from Split_Criteria import gini, entropy, information_gain
+from Split_Criteria import (gini,
+                            information_gain,
+                            chi_square,
+                            g_stat,
+                            mantaras, 
+                            hg_distribution)
 import numpy as np
 from sklearn.datasets import load_iris
 from sklearn.model_selection import train_test_split
@@ -30,26 +35,37 @@ class DecisionTree:
     def _grow_tree(self, X, y, depth=0):
         n_samples, n_features = X.shape
         n_labels = len(np.unique(y))
-        
-        # stopping criteria: max depth reached, pure node or too few samples
-        if (depth >= self.max_depth or
-            n_labels == 1 or
-            n_samples < 2):
+    
+        # Critères d'arrêt : profondeur max atteinte, noeud pur ou trop peu d'exemples
+        if (depth >= self.max_depth or n_labels == 1 or n_samples < 2):
             leaf_value = self._most_common_label(y)
             return Node(value=leaf_value)
-        
-        # find best split
+    
+        # Trouver le meilleur split
         feat_idx, threshold = self._best_split(X, y, n_samples, n_features)
         if feat_idx is None:
-            # if no good split found, create leaf
+            # Si aucun bon split n'est trouvé, créer une feuille
             leaf_value = self._most_common_label(y)
             return Node(value=leaf_value)
-        
-        # split data, grow subtrees
+    
         left_idxs, right_idxs = self._split(X[:, feat_idx], threshold)
+    
+        # Check if group is empty
+        if len(left_idxs) == 0:  
+            print('ZEROOO')
+            leaf_value = self._most_common_label(y[right_idxs])
+            return Node(value=leaf_value)
+        if len(right_idxs) == 0: 
+            print('ZEROOO')
+            leaf_value = self._most_common_label(y[left_idxs])
+            return Node(value=leaf_value)
+        
+    
         left = self._grow_tree(X[left_idxs, :], y[left_idxs], depth + 1)
         right = self._grow_tree(X[right_idxs, :], y[right_idxs], depth + 1)
+    
         return Node(feat_idx, threshold, left, right)
+
 
     def _best_split(self, X, y, n_samples, n_features):
         best_gain = -1
@@ -59,6 +75,11 @@ class DecisionTree:
             X_column = X[:, feat_idx] # column of specific features
             thresholds = np.unique(X_column) 
             for threshold in thresholds: # go through all possible split values of the feature
+                # Check if the threshold creates an empty group
+                left_indices, right_indices = self._split(X_column, threshold)
+                if len(left_indices) == 0 or len(right_indices) == 0:
+                    continue
+                 
                 #Calculate gain for the current split
                 gain = self._calculate_criterion(y, X_column, threshold)
                 if gain > best_gain:
@@ -67,30 +88,10 @@ class DecisionTree:
                     split_threshold = threshold
         return split_idx, split_threshold
 
+
     def _calculate_criterion(self, y, X_column, threshold):
-        # Choose criterion function based on selected criterion
-        if self.criterion == 'gini':
-            return self._gini_gain(y, X_column, threshold)
-        elif self.criterion == 'entropy':
-            return self._information_gain(y, X_column, threshold)
-
-    def _gini_gain(self, y, X_column, threshold):
-        left_indices = X_column <= threshold
-        right_indices = X_column > threshold
-        # check if one group is empty
-        if len(y[left_indices]) == 0 or len(y[right_indices]) == 0:
-            return 0
-        # calculate proportion of data in left group
-        p = float(len(y[left_indices])) / len(y)
-        return gini(y) - p * gini(y[left_indices]) - (1 - p) * gini(y[right_indices])
-
-    def _information_gain(self, y, X_column, threshold):
-        left_indices = X_column <= threshold
-        right_indices = X_column > threshold
-        # check if one group is empty
-        if len(y[left_indices]) == 0 or len(y[right_indices]) == 0:
-            return 0
-        return information_gain(y, left_indices, right_indices)
+        criterion = SplitCriterion(self.criterion)
+        return criterion.calculate(y, X_column, threshold)
 
     def _most_common_label(self, y):
         most_common = np.argmax(np.bincount(y))
@@ -121,12 +122,69 @@ class Node:
         self.right = right
         self.value = value
 
-tree = DecisionTree(criterion='gini', max_depth=3)
+class SplitCriterion:
+    def __init__(self, criterion='gini'):
+        self.criterion = criterion
+    
+    def calculate(self, y, X_column, threshold):
+        if self.criterion == 'gini':
+            return self._gini_gain(y, X_column, threshold)
+        elif self.criterion == 'information_gain':
+            return self._information_gain(y, X_column, threshold)
+        elif self.criterion == 'g_stat':
+            return self._g_stat(y, X_column, threshold)
+        elif self.criterion == 'mantaras':
+            return self._mantaras(y, X_column, threshold)
+        elif self.criterion == 'hg_distribution':
+            return self._hg_distribution(y, X_column, threshold)
+        elif self.criterion == 'chi_square':
+            return self._chi_square(y, X_column, threshold)
+        else:
+            raise ValueError(f"Unsupported criterion: {self.criterion}")
+    
+    # Gene 0: Gini
+    def _gini_gain(self, y, X_column, threshold):
+        left_indices = X_column <= threshold
+        right_indices = X_column > threshold
+        # check if one group is empty
+        if len(y[left_indices]) == 0 or len(y[right_indices]) == 0:
+            return 0
+        # calculate proportion of data in left group
+        p = float(len(y[left_indices])) / len(y)
+        return gini(y) - p * gini(y[left_indices]) - (1 - p) * gini(y[right_indices])
+    
+    # Gene 1: Information Gain
+    def _information_gain(self, y, X_column, threshold):
+        left_indices = X_column <= threshold
+        right_indices = X_column > threshold
+        # check if one group is empty
+        if len(y[left_indices]) == 0 or len(y[right_indices]) == 0:
+            return 0
+        return information_gain(y, left_indices, right_indices)
+    
+    # Gene 3: G statistic
+    def _g_stat(self, y, X_column, threshold):
+        return g_stat(y, X_column, threshold)
+
+    # Gene 4: Mandaras
+    def _mantaras(self, y, X_column, threshold):
+        return mantaras(y, X_column, threshold)
+    
+    # Gene 5: Hypergeometric Distribution
+    def _hg_distribution(self, y, X_column, threshold):
+        return hg_distribution(y, X_column, threshold)
+    
+    # Gene 8: Chi-square
+    def _chi_square(self, y, X_column, threshold):
+        return chi_square(y, X_column, threshold)
+
+
+tree = DecisionTree(criterion='hg_distribution', max_depth=3)
 tree.fit(X_train, y_train)
 
 y_pred = tree.predict(X_test)
 
 accuracy = accuracy_score(y_test, y_pred)
-accuracy
+print(accuracy)
     
         
