@@ -4,8 +4,9 @@ Created on Fri Mar 28 12:17:19 2025
 
 @author: Catalina
 """
+import numpy as np
 class StoppingCriterion:
-    def __init__(self, n_tot_samples, criterion='max_depth', param=2):
+    def __init__(self, n_tot_samples, criterion, param=2):
         self.criterion = criterion
         self.param = param
 
@@ -39,19 +40,19 @@ class StoppingCriterion:
     
     # Check if stopping criterion is observed
     def stop(self, n_tot_samples, y, depth):
-        if self.criterion == 'homogeneity':  # Fixed the typo here
+        if self.criterion == 'homogeneity':
             if self.check_homogeneity(y):
                 return True
-        if self.criterion == 'max_depth': 
+        elif self.criterion == 'max_depth': 
             if self.check_max_depth(depth):
                 return True
-        if self.criterion == 'min_samples_split':
+        elif self.criterion == 'min_samples_split':
             if self.check_min_samples_split(y):
                 return True
-        if self.criterion == 'min_portion_split':
+        elif self.criterion == 'min_portion_split':
             if self.check_min_portion_split(y, n_tot_samples):
                 return True
-        if self.criterion == 'predictive_accuracy':
+        elif self.criterion == 'predictive_accuracy': 
             if self.check_predictive_accuracy(y):
                 return True
-        return False 
+        return False
