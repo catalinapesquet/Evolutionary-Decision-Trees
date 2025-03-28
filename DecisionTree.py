@@ -8,24 +8,27 @@ Created on Tue Mar 25 11:22:30 2025
 # DecisionTree 
 from Split_Criteria import (gini,
                             information_gain,
-                            chi_square,
                             g_stat,
                             mantaras, 
-                            hg_distribution)
+                            hg_distribution,
+                            chv_criterion,
+                            dcsm,
+                            chi_square,
+                            mpi,
+                            ORT,
+                            twoing,
+                            cair,
+                            gain_ratio,
+                            SplitCriterion)
 import numpy as np
 from sklearn.datasets import load_iris
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 
-iris= load_iris()
-X, y = iris.data, iris.target
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
-
-
 class DecisionTree:
-    def __init__(self, criterion='gini', max_depth=None):
+    def __init__(self, criterion='gini', stopping_criteria=None):
         self.criterion = criterion
-        self.max_depth = max_depth
+        self.stopping_criteria = stopping_criteria if stopping_criteria else StoppingCriterion(criterion='max_depth', threshold=5)
 
     def fit(self, X, y):
         self.n_classes_ = len(np.unique(y))
@@ -36,12 +39,12 @@ class DecisionTree:
         n_samples, n_features = X.shape
         n_labels = len(np.unique(y))
     
-        # Critères d'arrêt : profondeur max atteinte, noeud pur ou trop peu d'exemples
-        if (depth >= self.max_depth or n_labels == 1 or n_samples < 2):
+        # Check if stopping condition is reached
+        if self.stopping_criteria.stop(y, depth):
             leaf_value = self._most_common_label(y)
             return Node(value=leaf_value)
     
-        # Trouver le meilleur split
+        # Find best split
         feat_idx, threshold = self._best_split(X, y, n_samples, n_features)
         if feat_idx is None:
             # Si aucun bon split n'est trouvé, créer une feuille
@@ -52,11 +55,11 @@ class DecisionTree:
     
         # Check if group is empty
         if len(left_idxs) == 0:  
-            print('ZEROOO')
+            print('Left group is empty')
             leaf_value = self._most_common_label(y[right_idxs])
             return Node(value=leaf_value)
         if len(right_idxs) == 0: 
-            print('ZEROOO')
+            print('Right group is empty')
             leaf_value = self._most_common_label(y[left_idxs])
             return Node(value=leaf_value)
         
@@ -114,6 +117,28 @@ class DecisionTree:
                 node = node.right
         return node.value
 
+class StoppingCriterion:
+    def __init__(self, criterion='max_depth', threshold=None):
+        self.criterion = criterion
+        self.threshold = threshold
+
+    def check_max_depth(self, depth):
+        if self.criterion == 'max_depth':
+            return depth >= self.threshold
+        return False
+
+    def check_homogeneity(self, y):
+        if self.criterion == 'homogeneity':
+            return len(np.unique(y)) == 1  # Only one unique class left
+        return False
+
+    def stop(self, y, depth):
+        if self.check_max_depth(depth):
+            return True
+        if self.check_homogeneity(y):
+            return True
+        return False
+
 class Node:
     def __init__(self, feat_idx=None, threshold=None, left=None, right=None, *, value=None):
         self.feat_idx = feat_idx
@@ -122,64 +147,12 @@ class Node:
         self.right = right
         self.value = value
 
-class SplitCriterion:
-    def __init__(self, criterion='gini'):
-        self.criterion = criterion
-    
-    def calculate(self, y, X_column, threshold):
-        if self.criterion == 'gini':
-            return self._gini_gain(y, X_column, threshold)
-        elif self.criterion == 'information_gain':
-            return self._information_gain(y, X_column, threshold)
-        elif self.criterion == 'g_stat':
-            return self._g_stat(y, X_column, threshold)
-        elif self.criterion == 'mantaras':
-            return self._mantaras(y, X_column, threshold)
-        elif self.criterion == 'hg_distribution':
-            return self._hg_distribution(y, X_column, threshold)
-        elif self.criterion == 'chi_square':
-            return self._chi_square(y, X_column, threshold)
-        else:
-            raise ValueError(f"Unsupported criterion: {self.criterion}")
-    
-    # Gene 0: Gini
-    def _gini_gain(self, y, X_column, threshold):
-        left_indices = X_column <= threshold
-        right_indices = X_column > threshold
-        # check if one group is empty
-        if len(y[left_indices]) == 0 or len(y[right_indices]) == 0:
-            return 0
-        # calculate proportion of data in left group
-        p = float(len(y[left_indices])) / len(y)
-        return gini(y) - p * gini(y[left_indices]) - (1 - p) * gini(y[right_indices])
-    
-    # Gene 1: Information Gain
-    def _information_gain(self, y, X_column, threshold):
-        left_indices = X_column <= threshold
-        right_indices = X_column > threshold
-        # check if one group is empty
-        if len(y[left_indices]) == 0 or len(y[right_indices]) == 0:
-            return 0
-        return information_gain(y, left_indices, right_indices)
-    
-    # Gene 3: G statistic
-    def _g_stat(self, y, X_column, threshold):
-        return g_stat(y, X_column, threshold)
-
-    # Gene 4: Mandaras
-    def _mantaras(self, y, X_column, threshold):
-        return mantaras(y, X_column, threshold)
-    
-    # Gene 5: Hypergeometric Distribution
-    def _hg_distribution(self, y, X_column, threshold):
-        return hg_distribution(y, X_column, threshold)
-    
-    # Gene 8: Chi-square
-    def _chi_square(self, y, X_column, threshold):
-        return chi_square(y, X_column, threshold)
+iris= load_iris()
+X, y = iris.data, iris.target
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
 
-tree = DecisionTree(criterion='hg_distribution', max_depth=3)
+tree = DecisionTree(criterion='gain_ratio', max_depth=3)
 tree.fit(X_train, y_train)
 
 y_pred = tree.predict(X_test)
