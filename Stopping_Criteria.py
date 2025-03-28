@@ -1,0 +1,57 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Mar 28 12:17:19 2025
+
+@author: Catalina
+"""
+class StoppingCriterion:
+    def __init__(self, n_tot_samples, criterion='max_depth', param=2):
+        self.criterion = criterion
+        self.param = param
+
+    # Gene 0: Reaching homogeneity
+    def check_homogeneity(self, y):
+        return len(np.unique(y)) == 1  # Only one unique class left
+    
+    # Gene 1: Reaching Maximum Depth
+    def check_max_depth(self, depth):
+        return depth >= self.param
+    
+    # Gene 2: Reaching Minimum Number of Instances in non terminal node
+    def check_min_samples_split(self,y):
+        return len(y) < self.param
+    
+    # Gene 3: Reaching Minimum Percentage of Instances in non terminal node
+    def check_min_portion_split(self, y, n_tot_samples):
+        # Map from [0, 100] to [1,10]
+        param = (self.param % 10) + 1
+        return len(y) / n_tot_samples < self.param  # Compare to total number of instances
+    
+    # Gene 4: Reaching a Predictive Accuracy within a Node
+    def check_predictive_accuracy(self, y):
+        # Map from [0, 100] to {70, 75, 80, 85, 90, 95, 100}
+        mapped_param = (self.param % 7) * 5 + 70 
+        # Identify majority class
+        majority_class = np.argmax(np.bincount(y))
+        # Calculate predictive accuracy
+        predictive_accuracy = np.sum(y == majority_class) / len(y)
+        return predictive_accuracy >= mapped_param
+    
+    # Check if stopping criterion is observed
+    def stop(self, n_tot_samples, y, depth):
+        if self.criterion == 'homogeneity':  # Fixed the typo here
+            if self.check_homogeneity(y):
+                return True
+        if self.criterion == 'max_depth': 
+            if self.check_max_depth(depth):
+                return True
+        if self.criterion == 'min_samples_split':
+            if self.check_min_samples_split(y):
+                return True
+        if self.criterion == 'min_portion_split':
+            if self.check_min_portion_split(y, n_tot_samples):
+                return True
+        if self.criterion == 'predictive_accuracy':
+            if self.check_predictive_accuracy(y):
+                return True
+        return False 

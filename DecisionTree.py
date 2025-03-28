@@ -5,7 +5,6 @@ Created on Tue Mar 25 11:22:30 2025
 @author: Catalina
 """
 
-# DecisionTree 
 from Split_Criteria import (gini,
                             information_gain,
                             g_stat,
@@ -20,34 +19,40 @@ from Split_Criteria import (gini,
                             cair,
                             gain_ratio,
                             SplitCriterion)
+from Stopping_Criteria import StoppingCriterion
+
 import numpy as np
 from sklearn.datasets import load_iris
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 
 class DecisionTree:
-    def __init__(self, criterion='gini', stopping_criteria=None):
+    def __init__(self, criterion='gini', stopping_criteria='max_depth', param=3):
         self.criterion = criterion
-        self.stopping_criteria = stopping_criteria if stopping_criteria else StoppingCriterion(criterion='max_depth', threshold=5)
-
+        self.param = param
+        self.stopping_criteria = StoppingCriterion(stopping_criteria, param=self.param)
+        
     def fit(self, X, y):
         self.n_classes_ = len(np.unique(y))
         self.n_features_ = X.shape[1]
-        self.tree_ = self._grow_tree(X, y)
+        # size of total dataset
+        n_tot_samples = len(y)
+        self.tree_ = self._grow_tree(X, y, n_tot_samples)
 
-    def _grow_tree(self, X, y, depth=0):
-        n_samples, n_features = X.shape
+    def _grow_tree(self, X, y, n_tot_samples, depth=0):
+        # size of parent node
+        n_samples, n_features = X.shape 
         n_labels = len(np.unique(y))
     
         # Check if stopping condition is reached
-        if self.stopping_criteria.stop(y, depth):
+        if self.stopping_criteria.stop(n_tot_samples, y, depth):
             leaf_value = self._most_common_label(y)
             return Node(value=leaf_value)
     
         # Find best split
         feat_idx, threshold = self._best_split(X, y, n_samples, n_features)
         if feat_idx is None:
-            # Si aucun bon split n'est trouvé, créer une feuille
+            # If no good split is found, create leaf node
             leaf_value = self._most_common_label(y)
             return Node(value=leaf_value)
     
@@ -55,17 +60,15 @@ class DecisionTree:
     
         # Check if group is empty
         if len(left_idxs) == 0:  
-            print('Left group is empty')
             leaf_value = self._most_common_label(y[right_idxs])
             return Node(value=leaf_value)
         if len(right_idxs) == 0: 
-            print('Right group is empty')
             leaf_value = self._most_common_label(y[left_idxs])
             return Node(value=leaf_value)
         
     
-        left = self._grow_tree(X[left_idxs, :], y[left_idxs], depth + 1)
-        right = self._grow_tree(X[right_idxs, :], y[right_idxs], depth + 1)
+        left = self._grow_tree(X[left_idxs, :], y[left_idxs], n_tot_samples, depth + 1)
+        right = self._grow_tree(X[right_idxs, :], y[right_idxs], n_tot_samples, depth + 1)
     
         return Node(feat_idx, threshold, left, right)
 
@@ -117,28 +120,6 @@ class DecisionTree:
                 node = node.right
         return node.value
 
-class StoppingCriterion:
-    def __init__(self, criterion='max_depth', threshold=None):
-        self.criterion = criterion
-        self.threshold = threshold
-
-    def check_max_depth(self, depth):
-        if self.criterion == 'max_depth':
-            return depth >= self.threshold
-        return False
-
-    def check_homogeneity(self, y):
-        if self.criterion == 'homogeneity':
-            return len(np.unique(y)) == 1  # Only one unique class left
-        return False
-
-    def stop(self, y, depth):
-        if self.check_max_depth(depth):
-            return True
-        if self.check_homogeneity(y):
-            return True
-        return False
-
 class Node:
     def __init__(self, feat_idx=None, threshold=None, left=None, right=None, *, value=None):
         self.feat_idx = feat_idx
@@ -147,14 +128,14 @@ class Node:
         self.right = right
         self.value = value
 
+# Testing on a well known dataset
 iris= load_iris()
 X, y = iris.data, iris.target
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
 
-tree = DecisionTree(criterion='gain_ratio', max_depth=3)
+tree = DecisionTree(criterion='gini', stopping_criteria='predictive_accuracy', param=14)
 tree.fit(X_train, y_train)
-
 y_pred = tree.predict(X_test)
 
 accuracy = accuracy_score(y_test, y_pred)
