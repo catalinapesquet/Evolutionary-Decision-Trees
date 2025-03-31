@@ -12,6 +12,7 @@ class MissingValues:
     def __init__(self, mv_split='ignore_all', mv_distrib='ignore_all'):
         self.mv_split = mv_split
         self.mv_distrib = mv_distrib
+        self.split_criteria = SplitCriterion()
     
     def handle_split(self, X, y, feature):
         if self.mv_split == "ignore_all":
@@ -28,6 +29,9 @@ class MissingValues:
     # HANDLING MISSING VALUES DURING SPLIT CRITERION EVALUATION
     # Gene 0: Ignore All instances with missing values
     def ignore_all_split(self, X, y, feature):
+        """
+        Simply ignore instances where the attribute value is missing when evaluating the split criterion.
+        """
         # Select instances without missing values
         not_missing_mask = X[feature].notna()
         X_filtered = X[not_missing_mask].copy()
@@ -36,6 +40,9 @@ class MissingValues:
     
     # Gene 1: Impute Missing Values with mode or mean
     def impute_mv_split(self, X, y, feature):
+        """ 
+        Impute missing values with mode or mean.
+        """
         X_copy = X.copy()
         # Check if values are numerical or categorical
         if pd.api.types.is_numeric_dtype(X_copy[feature]):
@@ -44,64 +51,18 @@ class MissingValues:
         else:
             # Mode if categorical
             fill_value = X_copy[feature].mode().iloc[0]  
-    
         X_copy[feature] = X_copy[feature].fillna(fill_value)
         return X_copy, y, X_copy[feature]
 
     # Gene 2: Weight Splitting Criterion
-    def weight_split(self, X, y, feature):
-        # Calculate the proportion of each known value
-        known_values = X[feature].dropna()
-        value_counts = known_values.value_counts(normalize=True)
-        # Distribute missing values proportionally
-        missing_mask = X[feature].isna()
-        X_copy = X.copy()
-        for value, proportion in value_counts.items():
-            missing_indices = X_copy[missing_mask].index
-            num_missing = len(missing_indices)
-            num_to_fill = int(num_missing * proportion)
-            fill_indices = missing_indices[:num_to_fill]
-            X_copy.loc[fill_indices, feature] = value
-            missing_mask.loc[fill_indices] = False  # Update mask to reflect filled values
-
-        return X_copy, y, X_copy[feature]
-    
-    def calculate_weighted_impurity(self, y, criterion='gini', weights=None):
-        if weights is None:
-            weights = np.ones(len(y)) / len(y)
-        else:
-            weights = np.array(weights) / np.sum(weights)
-
-        class_counts = pd.Series(y).value_counts()
-        impurity = 0
-        for cls, count in class_counts.items():
-            proportion = weights[y == cls].sum()
-            if proportion > 0:
-                if criterion == 'gini':
-                    impurity += proportion * (1 - proportion)
-                elif criterion == 'entropy':
-                    impurity -= proportion * np.log2(proportion)
-        return impurity
-
-    def calculate_weighted_information_gain(self, X, y, feature, criterion='gini'):
-        known_mask = ~X[feature].isna()
-        known_indices = X[known_mask].index
-        missing_indices = X[~known_mask].index
-
-        if known_indices.empty:
-            return 0
-
-        parent_impurity = self.calculate_weighted_impurity(y, criterion=criterion)
-        children_impurity = 0
-        value_counts = X[feature].value_counts(normalize=True)
-
-        for value, proportion in value_counts.items():
-            subset_indices = X[X[feature] == value].index
-            subset_y = y.loc[subset_indices]
-            children_impurity += proportion * self.calculate_weighted_impurity(subset_y, criterion=criterion)
-
-        gain = parent_impurity - children_impurity
-        return gain
+    def weight_split(self, X, y, feature, criterion_type):
+        # Calculate the proportion of missing values
+        proportion_missing = X[feature].isnull().mean()
+        # Calculate the criterion using the SplitCriteria class
+        criterion_value = self.split_criteria.calculate(X, y, feature)
+        # Adjust the criterion value by the proportion of missing values
+        adjusted_value = criterion_value * (1 - proportion_missing)
+        return adjusted_value
     
     # Gene 3: Impute Missing Values with mode/mean of instances of same class
     def impute_mv_class_split(self, X, y, feature):
@@ -136,16 +97,16 @@ class MissingValues:
     # How the distribution is done after we find the best split 
     def apply_split_with_mv(self, X, y, feature, split_value):
         if self.mv_distrib == 'ignore_all':
-            return self.ignore_instance(X, y, feature, split_value)
+            return self.ignore_all_dis(X, y, feature, split_value)
         elif self.mv_distrib == 'most_common':
-            return self.most_common_value(X, y, feature, split_value)
+            return self.impute_mv_dis(X, y, feature, split_value)
         elif self.mv_distrib == 'class_specific_common':
-            return self.class_specific_common_value(X, y, feature, split_value)
+            return self.impute_mv_class_dis(X, y, feature, split_value)
         elif self.mv_distrib == 'assign_all':
-            return self.assign_to_all_partitions(X, y, feature, split_value)
+            return self.assign_all_dis(X, y, feature, split_value)
         elif self.mv_distrib == 'largest_partition':
-            return self.largest_partition(X, y, feature, split_value)
-        elif self.mv_distrib == 'partition_probability':
+            return self.largest_part_dis(X, y, feature, split_value)
+        elif self.mv_distrib == 'weight_dis':
             return self.partition_probability(X, y, feature, split_value)
         elif self.mv_distrib == 'most_probable_partition':
             return self.most_probable_partition(X, y, feature, split_value)
@@ -211,23 +172,99 @@ class MissingValues:
         """
         Distributes instances with missing values to both left and right partitions.
         """
-        # Implement logic to assign to all partitions
-        pass
+        # Split the instances based on the split value
+        left_mask = X[feature] <= split_value
+        right_mask = X[feature] > split_value
+        left_split = (X[left_mask], y[left_mask])
+        right_split = (X[right_mask], y[right_mask])
+        # Assign instances with missing values to both partitions
+        missing_mask = X[feature].isnull()
+        X_missing = X[missing_mask]
+        y_missing = y[missing_mask]
+        left_split = (
+            pd.concat([left_split[0], X_missing]),
+            pd.concat([left_split[1], y_missing])
+        )
+        right_split = (
+            pd.concat([right_split[0], X_missing]),
+            pd.concat([right_split[1], y_missing]))
+        
+        return left_split, right_split
 
     def largest_part_dis(self, X, y, feature, split_value):
         """
         Assigns instances with missing values to the partition with the most instances.
         """
-        # Implement logic to assign to the largest partition
-        pass
+        # Split the instances based on the split value
+        left_mask = X[feature] <= split_value
+        right_mask = X[feature] > split_value
+        left_split = (X[left_mask], y[left_mask])
+        right_split = (X[right_mask], y[right_mask])
+        # Determine the largest partition
+        if left_split[0].shape[0] >= right_split[0].shape[0]:
+            largest_split = left_split
+        else:
+            largest_split = right_split
+        # Assign instances with missing values to the largest partition
+        missing_mask = X[feature].isnull()
+        X_missing = X[missing_mask]
+        y_missing = y[missing_mask]
+        largest_split = (
+            pd.concat([largest_split[0], X_missing]),
+            pd.concat([largest_split[1], y_missing])
+        )
+        return largest_split, (pd.DataFrame(), pd.Series())  # Return empty for the other partition
 
-    def probability_dis(self, X, y, feature, split_value):
-        # Implement logic to weight by partition probability
-        pass
+    def weight_dis(self, X, y, feature, split_value):
+        """
+        Distributes instances with missing values based on the probability of each partition.
+        """
+        # Split the instances based on the split value
+        left_mask = X[feature] <= split_value
+        right_mask = X[feature] > split_value
+        left_split = (X[left_mask], y[left_mask])
+        right_split = (X[right_mask], y[right_mask])
+        # Calculate the probability of each partition
+        total = X.shape[0]
+        left_prob = left_split[0].shape[0] / total
+        right_prob = right_split[0].shape[0] / total
+        # Assign instances with missing values based on partition probability
+        missing_mask = X[feature].isnull()
+        X_missing = X[missing_mask]
+        y_missing = y[missing_mask]
+        left_split = (
+            pd.concat([left_split[0], X_missing.sample(frac=left_prob)]),
+            pd.concat([left_split[1], y_missing.sample(frac=left_prob)])
+        )
+        right_split = (
+            pd.concat([right_split[0], X_missing.sample(frac=right_prob)]),
+            pd.concat([right_split[1], y_missing.sample(frac=right_prob)])
+        )
+        return left_split, right_split
 
     def most_probable_partition(self, X, y, feature, split_value):
-        # Implement logic to assign to the most probable partition
-        pass
+        """
+        Assigns instances with missing values to the partition that is most probable considering the class.
+        """
+        # Split the instances based on the split value
+        left_mask = X[feature] <= split_value
+        right_mask = X[feature] > split_value
+        left_split = (X[left_mask], y[left_mask])
+        right_split = (X[right_mask], y[right_mask])
+        # Determine the largest partition
+        if left_split[0].shape[0] >= right_split[0].shape[0]:
+            largest_split = left_split
+        else:
+            largest_split = right_split
+        # Assign instances with missing values to the largest partition
+        missing_mask = X[feature].isnull()
+        X_missing = X[missing_mask]
+        y_missing = y[missing_mask]
+        largest_split = (
+            pd.concat([largest_split[0], X_missing]),
+            pd.concat([largest_split[1], y_missing])
+        )
+        return largest_split, (pd.DataFrame(), pd.Series())  # Return empty for the other partition
 
     def _split_helper(self, X_col, split_threshold):
         left_indices = np.argwhere(X_col <= split_threshold).flatten()
