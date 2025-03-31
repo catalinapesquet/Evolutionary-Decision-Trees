@@ -53,9 +53,7 @@ def g_stat(y, X_column, threshold):
 
     left_indices = X_column <= threshold
     right_indices = X_column > threshold
-
     m_v = np.array([np.sum(left_indices), np.sum(right_indices)])  # Number of elements in each group
-
     f_cv = np.zeros((C, 2), dtype=int)  # Correct initialization of the f_cv matrix
     for c in range(C):
         f_cv[c, 0] = np.sum(y[left_indices] == c)  # Count of instances of class c in the left group
@@ -110,27 +108,27 @@ def mantaras(y, X_column, threshold):
 # Gene 5: Hypergeometric Distribution
 
 def hg_distribution(y, X_column, threshold):
-    C = len(np.unique(y))  # Nombre de classes
-    V = 2  # Nombre de sous-groupes (gauche et droite)
-    n_c = np.bincount(y)  # Nombre d'apparitions de chaque classe dans le groupe total
-    N = len(X_column)  # Total des éléments
+    C = len(np.unique(y))  # Number of classes
+    V = 2  # Number of branches
+    n_c = np.bincount(y)  # Number of apparition of each class in parent node
+    N = len(X_column)  
 
     left_indices = X_column <= threshold
     right_indices = X_column > threshold
 
-    m_v = np.array([np.sum(left_indices), np.sum(right_indices)])  # Nombre d'éléments dans chaque groupe
+    m_v = np.array([np.sum(left_indices), np.sum(right_indices)])  # size of each group
 
-    f_cv = np.zeros((C, V), dtype=int)  # Initialisation correcte de la matrice f_cv
+    f_cv = np.zeros((C, V), dtype=int) 
     for c in range(C):
-        f_cv[c, 0] = np.sum(y[left_indices] == c)  # Compte des instances de la classe c dans le groupe gauche
-        f_cv[c, 1] = np.sum(y[right_indices] == c)  # Compte des instances de la classe c dans le groupe droit
+        f_cv[c, 0] = np.sum(y[left_indices] == c)  # Count classes in left group
+        f_cv[c, 1] = np.sum(y[right_indices] == c)  # Count classes in right group
 
-    # Utilisation des logarithmes pour éviter les débordements
+    # Handle overlapping with logaritmic
     log_numerator = sum(gammaln(count + 1) for count in n_c) + sum(gammaln(count + 1) for count in m_v)
     log_denominator = gammaln(N + 1) + sum(gammaln(f_cv[c, v] + 1) for v in range(V) for c in range(C))
 
     if log_denominator == float('inf'):
-        return 1.0  # Gestion du cas où le dénominateur est infini
+        return 1.0  
     else:
         log_P0 = log_numerator - log_denominator
         gain = 1 - np.exp(log_P0)
@@ -214,7 +212,7 @@ def dcsm(y, X_column, threshold):
 
     # Calculate for left group
     N_left = len(left)
-    C_left = np.unique(left) # nombre de classes distinctes dans le groupe gauche
+    C_left = np.unique(left) # number of distinc classes in left group
     D_left = len(C_left)
     if D_u > 0: # handle division by zero
         d_left = D_left / D_u
@@ -231,7 +229,7 @@ def dcsm(y, X_column, threshold):
 
     # Calculte for right group
     N_right = len(right)
-    C_right = np.unique(right) # nombre de classes distinctes dans le groupe droit
+    C_right = np.unique(right) # number of distinct classes in right group
     D_right = len(C_right)
     if D_u > 0: # handle division by zero
         d_right = D_right/ D_u
@@ -338,18 +336,18 @@ def ORT(y, X_column, threshold):
 
 # Gene 12: Twoing
 def twoing(y, X_column, threshold):
-    L_indices = X_column <= threshold
-    R_indices = X_column > threshold
-    L = y[L_indices]
-    R = y[R_indices]
+    left_indices = X_column <= threshold
+    right_indices = X_column > threshold
+    left = y[L_indices]
+    right = y[R_indices]
 
     # Check if one group is empty. If so, PL or PR will be 0, making the twoing criterion 0.
     if len(L) == 0 or len(R) == 0:
         return 0.0
 
     n_total = len(y)
-    n_L = len(L)
-    n_R = len(R)
+    n_L = len(left)
+    n_R = len(right)
 
     # Calculate PL and PR
     PL = n_L / n_total
