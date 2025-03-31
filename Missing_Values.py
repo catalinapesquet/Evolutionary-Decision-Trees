@@ -6,25 +6,28 @@ Created on Fri Mar 28 14:14:37 2025
 """
 import pandas as pd
 import numpy as np
+from Split_Criteria import SplitCriterion
 
 class MissingValues:
-    def __init__(self, mv_split):
+    def __init__(self, mv_split='ignore_all', mv_distrib='ignore_all'):
         self.mv_split = mv_split
+        self.mv_distrib = mv_distrib
     
     def handle_split(self, X, y, feature):
         if self.mv_split == "ignore_all":
-            return self.ignore_all(X, y, feature)
+            return self.ignore_all_split(X, y, feature)
         elif self.mv_split == "impute_mv":
-            return self.impute_mv(X, y, feature)
+            return self.impute_mv_split(X, y, feature)
         elif self.mv_split == "weight_split":
             return self.weight_split(X, y, feature)
         elif self.mv_split == "impute_mv_class":
-            return self.impute_mv_class(X, y, feature)
+            return self.impute_mv_class_split(X, y, feature)
         else:
             raise ValueError(f"Unsupported criterion: {self.mv_split}")
-            
+    
+    # HANDLING MISSING VALUES DURING SPLIT CRITERION EVALUATION
     # Gene 0: Ignore All instances with missing values
-    def ignore_all(self, X, y, feature):
+    def ignore_all_split(self, X, y, feature):
         # Select instances without missing values
         not_missing_mask = X[feature].notna()
         X_filtered = X[not_missing_mask].copy()
@@ -32,7 +35,7 @@ class MissingValues:
         return X_filtered, y_filtered, X[feature]
     
     # Gene 1: Impute Missing Values with mode or mean
-    def impute_mv(self, X, y, feature):
+    def impute_mv_split(self, X, y, feature):
         X_copy = X.copy()
         # Check if values are numerical or categorical
         if pd.api.types.is_numeric_dtype(X_copy[feature]):
@@ -63,11 +66,12 @@ class MissingValues:
 
         return X_copy, y, X_copy[feature]
     
-    def calculate_weighted_impurity(self, y, criterion='entropy', weights=None):
+    def calculate_weighted_impurity(self, y, criterion='gini', weights=None):
         if weights is None:
             weights = np.ones(len(y)) / len(y)
         else:
             weights = np.array(weights) / np.sum(weights)
+
         class_counts = pd.Series(y).value_counts()
         impurity = 0
         for cls, count in class_counts.items():
@@ -79,33 +83,28 @@ class MissingValues:
                     impurity -= proportion * np.log2(proportion)
         return impurity
 
-    def calculate_weighted_information_gain(self, X, y, feature, criterion='entropy'):
-        # Convert y to pandas Series if it's not already
-        if not isinstance(y, pd.Series):
-            y = pd.Series(y)
-        # Indices des valeurs connues et manquantes pour la fonctionnalité
+    def calculate_weighted_information_gain(self, X, y, feature, criterion='gini'):
         known_mask = ~X[feature].isna()
         known_indices = X[known_mask].index
         missing_indices = X[~known_mask].index
+
         if known_indices.empty:
             return 0
-        # Calcul de l'impureté de l'ensemble courant
+
         parent_impurity = self.calculate_weighted_impurity(y, criterion=criterion)
-        # Calcul de l'impureté pour chaque valeur connue de la fonctionnalité
         children_impurity = 0
         value_counts = X[feature].value_counts(normalize=True)
-    
+
         for value, proportion in value_counts.items():
             subset_indices = X[X[feature] == value].index
             subset_y = y.loc[subset_indices]
             children_impurity += proportion * self.calculate_weighted_impurity(subset_y, criterion=criterion)
-        # Prise en compte des instances avec des valeurs manquantes lors du calcul du gain
+
         gain = parent_impurity - children_impurity
         return gain
-
     
     # Gene 3: Impute Missing Values with mode/mean of instances of same class
-    def impute_mv_class(self, X, y, feature):
+    def impute_mv_class_split(self, X, y, feature):
         X_copy = X.copy()
         
         # Loop through each instance with missing value
@@ -133,21 +132,102 @@ class MissingValues:
         
         return X_copy, y, X_copy[feature]
     
-    def apply_split_with_mv(self, X_column, threshold, mv_split):
-        if mv_split == "ignore_all":
-            left_idxs_not_missing, right_idxs_not_missing = self._split_helper(X_column[X_column.notna()].to_numpy(), threshold)
-            original_indices_not_missing = np.where(X_column.notna())
-            left_idxs = original_indices_not_missing[left_idxs_not_missing]
-            right_idxs = original_indices_not_missing[right_idxs_not_missing]
-            missing_indices = np.where(X_column.isna())
-            combined_left_idxs = np.unique(np.concatenate((left_idxs, missing_indices)))
-            combined_right_idxs = np.unique(np.concatenate((right_idxs, missing_indices)))
-            return combined_left_idxs, combined_right_idxs
-        elif mv_split in ["impute_mv", "impute_mv_class", "weight_split"]:
-            left_idxs, right_idxs = self._split_helper(X_column.to_numpy(), threshold)
-            return left_idxs, right_idxs
+    # HANDLING MISSING VALUES DURING DISTRIBUTION
+    # How the distribution is done after we find the best split 
+    def apply_split_with_mv(self, X, y, feature, split_value):
+        if self.mv_distrib == 'ignore_all':
+            return self.ignore_instance(X, y, feature, split_value)
+        elif self.mv_distrib == 'most_common':
+            return self.most_common_value(X, y, feature, split_value)
+        elif self.mv_distrib == 'class_specific_common':
+            return self.class_specific_common_value(X, y, feature, split_value)
+        elif self.mv_distrib == 'assign_all':
+            return self.assign_to_all_partitions(X, y, feature, split_value)
+        elif self.mv_distrib == 'largest_partition':
+            return self.largest_partition(X, y, feature, split_value)
+        elif self.mv_distrib == 'partition_probability':
+            return self.partition_probability(X, y, feature, split_value)
+        elif self.mv_distrib == 'most_probable_partition':
+            return self.most_probable_partition(X, y, feature, split_value)
         else:
-            raise ValueError(f"Unsupported mv_split: {mv_split}")
+            raise ValueError("Invalid distribution strategy specified.")
+    
+    # Gene 0: Ignoring all
+    def ignore_all_dis(self, X, y, feature, split_value):
+        # Filter out instances with missing values in the feature
+        mask = X[feature].notnull()
+        X_filtered = X[mask]
+        y_filtered = y[mask]
+    
+        # Split the filtered instances based on the split value
+        left_mask = X_filtered[feature] <= split_value
+        right_mask = X_filtered[feature] > split_value
+    
+        left_split = (X_filtered[left_mask], y_filtered[left_mask])
+        right_split = (X_filtered[right_mask], y_filtered[right_mask])
+    
+        return left_split, right_split
+    
+    # Gene 1: Impute Missing Values with mode or mean
+    def impute_mv_dis(self, X, y, feature, split_value):
+        # Determine the most common value for the feature
+        # Check if values are numerical or categorical
+        if X[feature].dtype == 'object':  
+            most_common = X[feature].mode()[0]
+        else: 
+            most_common = X[feature].mean()
+        # Fill missing values with the most common value
+        X_filled = X.copy()
+        X_filled[feature].fillna(most_common, inplace=True)
+        # Split the instances based on the split value
+        left_mask = X_filled[feature] <= split_value
+        right_mask = X_filled[feature] > split_value
+
+        left_split = (X_filled[left_mask], y[left_mask])
+        right_split = (X_filled[right_mask], y[right_mask])
+        return left_split, right_split
+    
+    # Gene 2: Impute Missing Values with mode/mean of instances of same class
+    def impute_mv_class_dis(self, X, y, feature, split_value):
+        # Determine the most common value for the feature within each class
+        if X[feature].dtype == 'object':  # Categorical feature
+            most_common_by_class = X.groupby(y)[feature].agg(lambda x: x.mode()[0])
+        else:  # Numerical feature
+            most_common_by_class = X.groupby(y)[feature].mean()
+        # Fill missing values with the class-specific most common value
+        X_filled = X.copy()
+        for class_label in most_common_by_class.index:
+            mask = (y == class_label) & X_filled[feature].isnull()
+            X_filled.loc[mask, feature] = most_common_by_class[class_label]
+        # Split the instances based on the split value
+        left_mask = X_filled[feature] <= split_value
+        right_mask = X_filled[feature] > split_value
+    
+        left_split = (X_filled[left_mask], y[left_mask])
+        right_split = (X_filled[right_mask], y[right_mask])
+        return left_split, right_split
+
+    def assign_all_dis(self, X, y, feature, split_value):
+        """
+        Distributes instances with missing values to both left and right partitions.
+        """
+        # Implement logic to assign to all partitions
+        pass
+
+    def largest_part_dis(self, X, y, feature, split_value):
+        """
+        Assigns instances with missing values to the partition with the most instances.
+        """
+        # Implement logic to assign to the largest partition
+        pass
+
+    def probability_dis(self, X, y, feature, split_value):
+        # Implement logic to weight by partition probability
+        pass
+
+    def most_probable_partition(self, X, y, feature, split_value):
+        # Implement logic to assign to the most probable partition
+        pass
 
     def _split_helper(self, X_col, split_threshold):
         left_indices = np.argwhere(X_col <= split_threshold).flatten()
