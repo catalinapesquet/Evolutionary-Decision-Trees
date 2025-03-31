@@ -6,14 +6,17 @@ Created on Fri Mar 28 14:14:37 2025
 """
 import pandas as pd
 import numpy as np
+from collections import defaultdict
 from Split_Criteria import SplitCriterion
 
 class MissingValues:
-    def __init__(self, mv_split='ignore_all', mv_distrib='ignore_all'):
+    def __init__(self, mv_split='ignore_all', mv_distrib='ignore_all', mv_classif='explore_all'):
         self.mv_split = mv_split
         self.mv_distrib = mv_distrib
+        self.mv_classif = mv_classif
         self.split_criteria = SplitCriterion()
     
+    # HANDLING MISSING VALUES DURING SPLIT CRITERION EVALUATION
     def handle_split(self, X, y, feature):
         if self.mv_split == "ignore_all":
             return self.ignore_all_split(X, y, feature)
@@ -26,7 +29,6 @@ class MissingValues:
         else:
             raise ValueError(f"Unsupported criterion: {self.mv_split}")
     
-    # HANDLING MISSING VALUES DURING SPLIT CRITERION EVALUATION
     # Gene 0: Ignore All instances with missing values
     def ignore_all_split(self, X, y, feature):
         """
@@ -41,7 +43,7 @@ class MissingValues:
     # Gene 1: Impute Missing Values with mode or mean
     def impute_mv_split(self, X, y, feature):
         """ 
-        Impute missing values with mode or mean.
+        Impute missing values with mode or mean regardless of their class.
         """
         X_copy = X.copy()
         # Check if values are numerical or categorical
@@ -66,6 +68,9 @@ class MissingValues:
     
     # Gene 3: Impute Missing Values with mode/mean of instances of same class
     def impute_mv_class_split(self, X, y, feature):
+        """ 
+        Impute missing values with mode or mean of isntances of same class.
+        """
         X_copy = X.copy()
         
         # Loop through each instance with missing value
@@ -107,7 +112,7 @@ class MissingValues:
         elif self.mv_distrib == 'largest_partition':
             return self.largest_part_dis(X, y, feature, split_value)
         elif self.mv_distrib == 'weight_dis':
-            return self.partition_probability(X, y, feature, split_value)
+            return self.weight_dis(X, y, feature, split_value)
         elif self.mv_distrib == 'most_probable_partition':
             return self.most_probable_partition(X, y, feature, split_value)
         else:
@@ -131,6 +136,9 @@ class MissingValues:
     
     # Gene 1: Impute Missing Values with mode or mean
     def impute_mv_dis(self, X, y, feature, split_value):
+        """
+        Impute missing values with mode/mean regardless of their class
+        """
         # Determine the most common value for the feature
         # Check if values are numerical or categorical
         if X[feature].dtype == 'object':  
@@ -139,7 +147,7 @@ class MissingValues:
             most_common = X[feature].mean()
         # Fill missing values with the most common value
         X_filled = X.copy()
-        X_filled[feature].fillna(most_common, inplace=True)
+        X_filled[feature] = X_filled[feature].fillna(most_common)
         # Split the instances based on the split value
         left_mask = X_filled[feature] <= split_value
         right_mask = X_filled[feature] > split_value
@@ -150,6 +158,9 @@ class MissingValues:
     
     # Gene 2: Impute Missing Values with mode/mean of instances of same class
     def impute_mv_class_dis(self, X, y, feature, split_value):
+        """
+        Impute missing values with mode/mean of instances of same class.
+        """
         # Determine the most common value for the feature within each class
         if X[feature].dtype == 'object':  # Categorical feature
             most_common_by_class = X.groupby(y)[feature].agg(lambda x: x.mode()[0])
@@ -172,24 +183,33 @@ class MissingValues:
         """
         Distributes instances with missing values to both left and right partitions.
         """
+    
         # Split the instances based on the split value
         left_mask = X[feature] <= split_value
         right_mask = X[feature] > split_value
-        left_split = (X[left_mask], y[left_mask])
-        right_split = (X[right_mask], y[right_mask])
+    
+        # Convert y to Series if needed
+        y_series = pd.Series(y) if not isinstance(y, pd.Series) else y
+    
+        left_split = (X[left_mask], y_series[left_mask])
+        right_split = (X[right_mask], y_series[right_mask])
+    
         # Assign instances with missing values to both partitions
         missing_mask = X[feature].isnull()
         X_missing = X[missing_mask]
-        y_missing = y[missing_mask]
+        y_missing = y_series[missing_mask]
+    
         left_split = (
-            pd.concat([left_split[0], X_missing]),
-            pd.concat([left_split[1], y_missing])
+            pd.concat([left_split[0], X_missing], ignore_index=True),
+            pd.concat([left_split[1], y_missing], ignore_index=True)
         )
+    
         right_split = (
-            pd.concat([right_split[0], X_missing]),
-            pd.concat([right_split[1], y_missing]))
-        
+            pd.concat([right_split[0], X_missing], ignore_index=True),
+            pd.concat([right_split[1], y_missing], ignore_index=True)
+        )
         return left_split, right_split
+
 
     def largest_part_dis(self, X, y, feature, split_value):
         """
@@ -200,20 +220,31 @@ class MissingValues:
         right_mask = X[feature] > split_value
         left_split = (X[left_mask], y[left_mask])
         right_split = (X[right_mask], y[right_mask])
+        
         # Determine the largest partition
         if left_split[0].shape[0] >= right_split[0].shape[0]:
             largest_split = left_split
         else:
             largest_split = right_split
+    
         # Assign instances with missing values to the largest partition
         missing_mask = X[feature].isnull()
         X_missing = X[missing_mask]
         y_missing = y[missing_mask]
+        # Ensure all data are converted to pandas DataFrame or Series types for concatenation 
+        X_part, y_part = largest_split
+        if isinstance(X_part, np.ndarray):
+            X_part = pd.DataFrame(X_part, index=range(len(X_part)))
+        if isinstance(y_part, np.ndarray):
+            y_part = pd.Series(y_part, index=range(len(y_part)))
+        if isinstance(y_missing, np.ndarray):
+            y_missing = pd.Series(y_missing, index=X_missing.index)
+    
         largest_split = (
-            pd.concat([largest_split[0], X_missing]),
-            pd.concat([largest_split[1], y_missing])
+            pd.concat([X_part, X_missing]),
+            pd.concat([y_part, y_missing])
         )
-        return largest_split, (pd.DataFrame(), pd.Series())  # Return empty for the other partition
+        return largest_split, (pd.DataFrame(), pd.Series())
 
     def weight_dis(self, X, y, feature, split_value):
         """
@@ -224,14 +255,28 @@ class MissingValues:
         right_mask = X[feature] > split_value
         left_split = (X[left_mask], y[left_mask])
         right_split = (X[right_mask], y[right_mask])
+        
         # Calculate the probability of each partition
         total = X.shape[0]
         left_prob = left_split[0].shape[0] / total
         right_prob = right_split[0].shape[0] / total
+        
         # Assign instances with missing values based on partition probability
         missing_mask = X[feature].isnull()
         X_missing = X[missing_mask]
-        y_missing = y[missing_mask]
+        y_missing = pd.Series(y[missing_mask], index=X_missing.index)
+        
+        # Convert to Series if necessary for compatibility with .concat
+        if isinstance(left_split[1], np.ndarray):
+            left_split = (
+                left_split[0],
+                pd.Series(left_split[1], index=left_split[0].index)
+            )
+        if isinstance(right_split[1], np.ndarray):
+            right_split = (
+                right_split[0],
+                pd.Series(right_split[1], index=right_split[0].index)
+            )
         left_split = (
             pd.concat([left_split[0], X_missing.sample(frac=left_prob)]),
             pd.concat([left_split[1], y_missing.sample(frac=left_prob)])
@@ -260,6 +305,13 @@ class MissingValues:
         missing_mask = X[feature].isnull()
         X_missing = X[missing_mask]
         y_missing = y[missing_mask]
+        if isinstance(largest_split[1], np.ndarray):
+            largest_split = (
+                largest_split[0],
+                pd.Series(largest_split[1], index=largest_split[0].index)
+            )
+        if isinstance(y_missing, np.ndarray):
+            y_missing = pd.Series(y_missing, index=X[feature].isnull()[X[feature].isnull()].index)
         largest_split = (
             pd.concat([largest_split[0], X_missing]),
             pd.concat([largest_split[1], y_missing])
@@ -271,7 +323,50 @@ class MissingValues:
         right_indices = np.argwhere(X_col > split_threshold).flatten()
         return left_indices, right_indices
     
-        
+    # HANDLING MISSING VALUES DURING CLASSIFICATION
+    def predict_explore_all(self, inputs, node, weight=1.0):
+        """
+        Recursively explores all branches when missing values are encountered.
+        Returns a dictionary with class votes weighted by path probabilities.
+        """
+        # If node is a leaf, return prediction with its weight
+        if node.left is None and node.right is None:
+            return {node.value: weight}
     
+        # If there is a missing value
+        if np.isnan(inputs[node.feat_idx]):
+            # 🔧 On choisit un poids égal (50/50), ou on pourrait utiliser des ratios appris
+            left_ratio = node.left_weight
+            right_ratio = node.right_weight
+    
+            # Recursively explore all branches 
+            left_votes = self.predict_explore_all(inputs, node.left, weight * left_ratio)
+            right_votes = self.predict_explore_all(inputs, node.right, weight * right_ratio)
+    
+            # Combine results in a dictionnary
+            combined_votes = defaultdict(float)
+            for cls, w in left_votes.items():
+                combined_votes[cls] += w
+            for cls, w in right_votes.items():
+                combined_votes[cls] += w
+            return combined_votes
         
+        # Else we follow normal path
+        elif inputs[node.feat_idx] <= node.threshold:
+            return self.predict_explore_all(inputs, node.left, weight)
+        else:
+            return self.predict_explore_all(inputs, node.right, weight)
         
+    # Gene 1: Most probable path
+    def _predict_most_probable(inputs):
+        """
+        Take the rout to the most probable partition (largest subset)
+        """
+        pass
+    
+    # Gene 2: Assign to majority class of node 
+    def _predict_stop_and_vote(inputs):
+        """
+        Halt the classification process and assign the instance to the majority class of node
+        """
+        pass
