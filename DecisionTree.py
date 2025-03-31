@@ -138,6 +138,7 @@ class DecisionTree:
                 X_df, y, feature=str(split_idx), split_value=split_threshold
             )
             return split_idx, split_threshold, left_idxs, right_idxs
+        return None, None, None, None
 
     def _calculate_criterion(self, y, X_column, threshold):
         criterion = SplitCriterion(self.criterion)
