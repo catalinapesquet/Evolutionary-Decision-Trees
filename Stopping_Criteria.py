@@ -16,17 +16,19 @@ class StoppingCriterion:
     
     # Gene 1: Reaching Maximum Depth
     def check_max_depth(self, depth):
-        return depth >= self.param
+        mapped_param = (self.param * 0.08) + 2
+        return depth >= mapped_param
     
     # Gene 2: Reaching Minimum Number of Instances in non terminal node
     def check_min_samples_split(self,y):
-        return len(y) < self.param
+        mapped_param = (self.param * 0.19) + 1
+        return len(y) < mapped_param
     
     # Gene 3: Reaching Minimum Percentage of Instances in non terminal node
     def check_min_portion_split(self, y, n_tot_samples):
         # Map from [0, 100] to [1,10]
-        param = (self.param % 10) + 1
-        return len(y) / n_tot_samples < self.param  # Compare to total number of instances
+        mapped_param = (self.param * 0.09) + 1
+        return len(y) / n_tot_samples < mapped_param  # Compare to total number of instances
     
     # Gene 4: Reaching a Predictive Accuracy within a Node
     def check_predictive_accuracy(self, y):
