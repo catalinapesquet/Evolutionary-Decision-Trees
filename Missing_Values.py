@@ -178,7 +178,8 @@ class MissingValues:
         left_split = (X_filled[left_mask], y[left_mask])
         right_split = (X_filled[right_mask], y[right_mask])
         return left_split, right_split
-
+    
+    # Gene 3: Assign to all nodes
     def assign_all_dis(self, X, y, feature, split_value):
         """
         Distributes instances with missing values to both left and right partitions.
@@ -210,7 +211,7 @@ class MissingValues:
         )
         return left_split, right_split
 
-
+    # Gene 4: Assign to largest partition
     def largest_part_dis(self, X, y, feature, split_value):
         """
         Assigns instances with missing values to the partition with the most instances.
@@ -245,7 +246,8 @@ class MissingValues:
             pd.concat([y_part, y_missing])
         )
         return largest_split, (pd.DataFrame(), pd.Series())
-
+    
+    # Gene 5: assign based on probability of each partition
     def weight_dis(self, X, y, feature, split_value):
         """
         Distributes instances with missing values based on the probability of each partition.
@@ -286,7 +288,8 @@ class MissingValues:
             pd.concat([right_split[1], y_missing.sample(frac=right_prob)])
         )
         return left_split, right_split
-
+    
+    # Gene 6: Assign to most probable partition
     def most_probable_partition(self, X, y, feature, split_value):
         """
         Assigns instances with missing values to the partition that is most probable considering the class.
@@ -324,14 +327,15 @@ class MissingValues:
         return left_indices, right_indices
     
     # HANDLING MISSING VALUES DURING CLASSIFICATION
+    # Gene 0: Explore all
     def predict_explore_all(self, inputs, node, weight=1.0):
         """
         Recursively explores all branches when missing values are encountered.
         Returns a dictionary with class votes weighted by path probabilities.
         """
         # If node is a leaf, return prediction with its weight
-        if node.left is None and node.right is None:
-            return {node.value: weight}
+        if node.is_leaf:
+            return {node.leaf_value: weight}
     
         # If there is a missing value
         if np.isnan(inputs[node.feat_idx]):
@@ -358,15 +362,41 @@ class MissingValues:
             return self.predict_explore_all(inputs, node.right, weight)
         
     # Gene 1: Most probable path
-    def _predict_most_probable(inputs):
+    def _predict_most_probable(self, inputs, node):
         """
         Take the rout to the most probable partition (largest subset)
         """
-        pass
+        # While not a leaf
+        while node.left:
+            val = inputs[node.feat_idx]
+            # If there is missing value
+            if np.isnan(val):
+                # Follow largest branch
+                if node.left_weight >= node.right_weight:
+                    node = node.left
+                else:
+                    node = node.right
+            elif val <= node.threshold:
+                node = node.left
+            else:
+                node = node.right
+        
+        return node.leaf_value if node.is_leaf else node.majority_class
     
-    # Gene 2: Assign to majority class of node 
-    def _predict_stop_and_vote(inputs):
-        """
-        Halt the classification process and assign the instance to the majority class of node
-        """
-        pass
+    # # Gene 2: Assign to majority class of node 
+    # def _predict_stop_and_vote(self, inputs, node):
+    #     """
+    #     Halt the classification process and assign the instance to the majority class of node
+    #     """
+    #     val = inputs[node.feat_idx]
+    #     # Check if val is an array and handle it accordingly
+    #     if isinstance(val, np.ndarray):
+    #         if np.isnan(val).any():
+    #             return node.majority_class # Halt and return the majority class of the current node
+    #     elif np.isnan(val):
+    #         return node.majority_class  # Halt and return the majority class of the current node
+    #     elif val <= node.threshold:
+    #         return self._predict_stop_and_vote(inputs, node.left)  # Traverse left
+    #     else:
+    #         return self._predict_stop_and_vote(inputs, node.right)  # Traverse right
+

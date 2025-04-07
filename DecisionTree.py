@@ -21,9 +21,11 @@ from Split_Criteria import (gini,
                             SplitCriterion)
 from Stopping_Criteria import StoppingCriterion
 from Missing_Values import MissingValues
+from Pruning_Strategies import Pruning
 
 import numpy as np
 import pandas as pd
+from collections import defaultdict
 from sklearn.datasets import load_iris
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
@@ -52,15 +54,21 @@ class DecisionTree:
         ...
     """
     def __init__(self, 
-                 stopping_criteria='max_depth', 
                  criterion='gini',
+                 stopping_criteria='max_depth', 
+                 param=3,
                  mv_split='ignore_all', 
                  mv_dis='ignore_all', 
-                 param=3):
+                 mv_classif='explore_all',
+                 pruning_method=None,
+                 pruning_param=None):
         self.criterion = criterion
         self.param = param
         self.stopping_criteria = stopping_criteria
-        self.mv_handler = MissingValues(mv_split, mv_dis)
+        self.mv_classif = mv_classif
+        self.mv_handler = MissingValues(mv_split, mv_dis, mv_classif)
+        self.pruning_method = pruning_method
+        self.pruning_param = pruning_param
         
     def fit(self, X, y):
         self.n_classes_ = len(np.unique(y))
@@ -71,41 +79,53 @@ class DecisionTree:
                                                    criterion=self.stopping_criteria, 
                                                    param=self.param)
         self.tree_ = self._grow_tree(X, y, n_tot_samples)
-
+        
+        
+        if self.pruning_method is not None:
+            pruner = Pruning(self.pruning_method, self.pruning_param)
+            self.tree_ = pruner.prune(self.tree_, X, y)
+    
     def _grow_tree(self, X, y, n_tot_samples, depth=0):
-        # size of parent node
-        n_samples, n_features = X.shape 
+        n_samples, n_features = X.shape
         n_labels = len(np.unique(y))
     
-        # Check if stopping condition is reached
+        majority_class = self._most_common_label(y)
+    
+        # Stopping condition
         if self.stopping_criteria.stop(n_tot_samples, y, depth):
-            leaf_value = self._most_common_label(y)
-            return Node(value=leaf_value)
-        
-        # Find best split
+            return Node(value=majority_class, is_leaf=True)
+    
+        # Best split
         split_idx, split_threshold, left_idxs, right_idxs = self._best_split(X, y, n_samples, n_features)
         if split_idx is None:
-            # If no good split is found, create leaf node
-            leaf_value = self._most_common_label(y)
-            return Node(value=leaf_value)
-        
-        
+            return Node(value=majority_class, is_leaf=True)
+    
         left_idxs, right_idxs = self._split(X[:, split_idx], split_threshold)
     
-        # Check if group is empty
-        if len(left_idxs) == 0:  
+        if len(left_idxs) == 0:
             leaf_value = self._most_common_label(y[right_idxs])
-            return Node(value=leaf_value)
-        if len(right_idxs) == 0: 
+            return Node(value=leaf_value, is_leaf=True)
+        if len(right_idxs) == 0:
             leaf_value = self._most_common_label(y[left_idxs])
-            return Node(value=leaf_value)
-        
+            return Node(value=leaf_value, is_leaf=True)
     
+        # Recursive growth
         left = self._grow_tree(X[left_idxs, :], y[left_idxs], n_tot_samples, depth + 1)
         right = self._grow_tree(X[right_idxs, :], y[right_idxs], n_tot_samples, depth + 1)
     
-        return Node(split_idx, split_threshold, left, right)
-        
+        node = Node(
+            feat_idx=split_idx,
+            threshold=split_threshold,
+            left=left,
+            right=right,
+            value=majority_class,
+            is_leaf=False
+        )
+        node.left_weight = len(left_idxs) / (len(left_idxs) + len(right_idxs))
+        node.right_weight = len(right_idxs) / (len(left_idxs) + len(right_idxs))
+    
+        return node
+
     def _best_split(self, X, y, n_samples, n_features):
         best_gain = -1
         split_idx, split_threshold = None, None
@@ -156,24 +176,35 @@ class DecisionTree:
         return left_indices, right_indices
     
     def predict(self, X):
-        return [self._predict(inputs) for inputs in X]
+        y_pred = []
+        for i, inputs in enumerate(X):
+            pred = self._predict(inputs)
+            if pred is None:
+                print(f"⚠️ Exemple {i} : prédiction = None → inputs = {inputs}")
+            y_pred.append(pred)
+        return y_pred
 
+    
     def _predict(self, inputs):
-        node = self.tree_
-        while node.left:
-            if inputs[node.feat_idx] <= node.threshold:
-                node = node.left
-            else:
-                node = node.right
-        return node.value
-
+        if self.mv_classif == 'explore_all':
+            result = self.mv_handler.predict_explore_all(inputs, self.tree_, weight=1.0)
+            return max(result.items(), key=lambda x: x[1])[0]
+        elif self.mv_classif == 'most_probable_path':
+            return self.mv_handler._predict_most_probable(inputs, self.tree_)
+        # elif self.mv_classif == 'stop_and_vote':
+        #     return self.mv_handler._predict_stop_and_vote(inputs, self.tree_)
+        else:
+            raise ValueError(f"Unknown mv_classification strategy: {self.mv_classif}")
+    
 class Node:
-    def __init__(self, feat_idx=None, threshold=None, left=None, right=None, *, value=None):
+    def __init__(self, feat_idx=None, threshold=None, left=None, right=None, value=None, is_leaf=False):
         self.feat_idx = feat_idx
         self.threshold = threshold
         self.left = left
         self.right = right
-        self.value = value
+        self.is_leaf = is_leaf
+        self.leaf_value = value if is_leaf else None
+        self.majority_class = value  # toujours défini
 
 # Testing on a well known dataset
 iris= load_iris()
@@ -185,15 +216,16 @@ X[5, 1] = np.nan
 X[10, 0] = np.nan
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
-tree = DecisionTree(criterion='gini', 
-                    stopping_criteria='max_depth',
-                    param=3, 
-                    mv_split='impute_mv',
-                    mv_dis='ignore_all')
-tree.fit(X_train, y_train)
-y_pred = tree.predict(X_test)
-
-accuracy = accuracy_score(y_test, y_pred)
-print(accuracy)
-    
-        
+# With REP pruning
+tree_with_prune = DecisionTree(criterion='gini', 
+                                stopping_criteria='max_depth',
+                                param=40, 
+                                mv_split='impute_mv',
+                                mv_dis='most_probable_partition',
+                                mv_classif='explore_all',
+                                pruning_method='MEP',
+                                pruning_param=20)  
+tree_with_prune.fit(X_train, y_train)
+y_pred_rep = tree_with_prune.predict(X_test)
+acc_rep = accuracy_score(y_test, y_pred_rep)
+print(f"Accuracy with PEP pruning : {acc_rep:.4f}")
