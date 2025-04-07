@@ -451,22 +451,22 @@ class SplitCriterion:
         self.criterion = criterion
     
     def calculate(self, y, X_column, threshold):
-        if self.criterion == 'gini':
+        if self.criterion == 'information_gain':
+            return self._information_gain(y, X_column, threshold) 
+        elif self.criterion == 'gini':
             return self._gini_gain(y, X_column, threshold)
-        elif self.criterion == 'information_gain':
-            return self._information_gain(y, X_column, threshold)
         elif self.criterion == 'g_stat':
             return self._g_stat(y, X_column, threshold)
         elif self.criterion == 'mantaras':
             return self._mantaras(y, X_column, threshold)
         elif self.criterion == 'hg_distribution':
             return self._hg_distribution(y, X_column, threshold)
-        elif self.criterion == 'chi_square':
-            return self._chi_square(y, X_column, threshold)
         elif self.criterion == 'chv_criterion':
             return self._chv_criterion(y, X_column, threshold)
         elif self.criterion == 'dcsm':
             return self._dscm(y, X_column, threshold)
+        elif self.criterion == 'chi_square':
+            return self._chi_square(y, X_column, threshold)
         elif self.criterion == 'mpi':
             return self._mpi(y, X_column, threshold)
         elif self.criterion == 'ort':
@@ -479,8 +479,17 @@ class SplitCriterion:
             return self._gain_ratio(y, X_column, threshold)
         else:
             raise ValueError(f"Unsupported criterion: {self.criterion}")
+            
+    # Gene 0: Information Gain
+    def _information_gain(self, y, X_column, threshold):
+        left_indices = X_column <= threshold
+        right_indices = X_column > threshold
+        # check if one group is empty
+        if len(y[left_indices]) == 0 or len(y[right_indices]) == 0:
+            return 0
+        return information_gain(y, left_indices, right_indices)
     
-    # Gene 0: Gini
+    # Gene 1: Gini
     def _gini_gain(self, y, X_column, threshold):
         left_indices = X_column <= threshold
         right_indices = X_column > threshold
@@ -490,15 +499,6 @@ class SplitCriterion:
         # calculate proportion of data in left group
         p = float(len(y[left_indices])) / len(y)
         return gini(y) - p * gini(y[left_indices]) - (1 - p) * gini(y[right_indices])
-    
-    # Gene 1: Information Gain
-    def _information_gain(self, y, X_column, threshold):
-        left_indices = X_column <= threshold
-        right_indices = X_column > threshold
-        # check if one group is empty
-        if len(y[left_indices]) == 0 or len(y[right_indices]) == 0:
-            return 0
-        return information_gain(y, left_indices, right_indices)
     
     # Gene 3: G statistic
     def _g_stat(self, y, X_column, threshold):
