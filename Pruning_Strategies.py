@@ -207,8 +207,31 @@ class Pruning:
     
         return node
 
-    def CCP(self, tree, X, y):
-        pass
+    def _CCP(self, tree, X, y):
+        val_size = min(max(self.param / 100.0, 0.1), 0.5)
+        X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=val_size, stratify=y)
+        sequence = self._generate_ccp_sequence(tree, X_train, y_train)
+        best_tree = self._select_best_ccp_tree(sequence, X_val, y_val)
+        return best_tree
+
+    def _generate_ccp_sequence(self, tree, X, y):
+        sequence = [deepcopy(tree)]
+        while True:
+            candidates = []
+            self._collect_alpha(tree, tree, X, y, candidates)
+            if not candidates:
+                break
+            node_to_prune = min(candidates, key=lambda x: x['alpha'])
+            node = node_to_prune['node']
+            X_node, y_node = self._collect_reachable_examples(tree, node, X, y)
+            majority_class = max(set(y_node), key=list(y_node).count)
+            node.left = None
+            node.right = None
+            node.is_leaf = True
+            node.leaf_value = majority_class
+            sequence.append(deepcopy(tree))
+        return sequence
+    
     def EBP(self, tree, X, y):
         pass
     

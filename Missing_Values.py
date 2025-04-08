@@ -10,24 +10,31 @@ from collections import defaultdict
 from Split_Criteria import SplitCriterion
 
 class MissingValues:
-    def __init__(self, mv_split='ignore_all', mv_distrib='ignore_all', mv_classif='explore_all'):
+    def __init__(self, mv_split='ignore_all', mv_distrib='ignore_all', mv_classif='explore_all', split_criterion=None):
         self.mv_split = mv_split
         self.mv_distrib = mv_distrib
         self.mv_classif = mv_classif
-        self.split_criteria = SplitCriterion()
+        self.split_criteria = split_criterion
     
     # HANDLING MISSING VALUES DURING SPLIT CRITERION EVALUATION
     def handle_split(self, X, y, feature):
+        feature = self._standardize_feature_name(feature) ####
         if self.mv_split == "ignore_all":
             return self.ignore_all_split(X, y, feature)
         elif self.mv_split == "impute_mv":
             return self.impute_mv_split(X, y, feature)
-        elif self.mv_split == "weight_split":
-            return self.weight_split(X, y, feature)
+        # elif self.mv_split == "weight_split":
+        #     return self.weight_split(X, y, feature)
         elif self.mv_split == "impute_mv_class":
             return self.impute_mv_class_split(X, y, feature)
         else:
             raise ValueError(f"Unsupported criterion: {self.mv_split}")
+            
+    ####
+    def _standardize_feature_name(self, feature):
+        if isinstance(feature, str) and feature.isdigit():
+            return int(feature)
+        return feature
     
     # Gene 0: Ignore All instances with missing values
     def ignore_all_split(self, X, y, feature):
@@ -35,16 +42,19 @@ class MissingValues:
         Simply ignore instances where the attribute value is missing when evaluating the split criterion.
         """
         # Select instances without missing values
+        feature = self._standardize_feature_name(feature)
         not_missing_mask = X[feature].notna()
         X_filtered = X[not_missing_mask].copy()
         y_filtered = y[not_missing_mask].copy()
-        return X_filtered, y_filtered, X[feature]
+        return X_filtered, y_filtered, X_filtered[feature]
+
     
     # Gene 1: Impute Missing Values with mode or mean
     def impute_mv_split(self, X, y, feature):
         """ 
         Impute missing values with mode or mean regardless of their class.
         """
+        feature = self._standardize_feature_name(feature)
         X_copy = X.copy()
         # Check if values are numerical or categorical
         if pd.api.types.is_numeric_dtype(X_copy[feature]):
@@ -57,12 +67,12 @@ class MissingValues:
         return X_copy, y, X_copy[feature]
 
     # Gene 2: Weight Splitting Criterion
-    def weight_split(self, X, y, feature, criterion_type):
-        # Calculate the proportion of missing values
+    def weight_split(self, X, y, feature):
+        feature = self._standardize_feature_name(feature)
+        if isinstance(feature, str) and feature.isdigit():
+            feature = int(feature)
         proportion_missing = X[feature].isnull().mean()
-        # Calculate the criterion using the SplitCriteria class
-        criterion_value = self.split_criteria.calculate(X, y, feature)
-        # Adjust the criterion value by the proportion of missing values
+        criterion_value = self.split_criteria.calculate(X.to_numpy(), y, int(feature))
         adjusted_value = criterion_value * (1 - proportion_missing)
         return adjusted_value
     
@@ -71,6 +81,7 @@ class MissingValues:
         """ 
         Impute missing values with mode or mean of isntances of same class.
         """
+        feature = self._standardize_feature_name(feature)
         X_copy = X.copy()
         
         # Loop through each instance with missing value
@@ -120,6 +131,7 @@ class MissingValues:
     
     # Gene 0: Ignoring all
     def ignore_all_dis(self, X, y, feature, split_value):
+        feature = self._standardize_feature_name(feature)
         # Filter out instances with missing values in the feature
         mask = X[feature].notnull()
         X_filtered = X[mask]
@@ -141,6 +153,7 @@ class MissingValues:
         """
         # Determine the most common value for the feature
         # Check if values are numerical or categorical
+        feature = self._standardize_feature_name(feature)
         if X[feature].dtype == 'object':  
             most_common = X[feature].mode()[0]
         else: 
@@ -161,6 +174,7 @@ class MissingValues:
         """
         Impute missing values with mode/mean of instances of same class.
         """
+        feature = self._standardize_feature_name(feature)
         # Determine the most common value for the feature within each class
         if X[feature].dtype == 'object':  # Categorical feature
             most_common_by_class = X.groupby(y)[feature].agg(lambda x: x.mode()[0])
@@ -184,7 +198,7 @@ class MissingValues:
         """
         Distributes instances with missing values to both left and right partitions.
         """
-    
+        feature = self._standardize_feature_name(feature)
         # Split the instances based on the split value
         left_mask = X[feature] <= split_value
         right_mask = X[feature] > split_value
@@ -216,6 +230,7 @@ class MissingValues:
         """
         Assigns instances with missing values to the partition with the most instances.
         """
+        feature = self._standardize_feature_name(feature)
         # Split the instances based on the split value
         left_mask = X[feature] <= split_value
         right_mask = X[feature] > split_value
@@ -294,6 +309,7 @@ class MissingValues:
         """
         Assigns instances with missing values to the partition that is most probable considering the class.
         """
+        feature = self._standardize_feature_name(feature)
         # Split the instances based on the split value
         left_mask = X[feature] <= split_value
         right_mask = X[feature] > split_value

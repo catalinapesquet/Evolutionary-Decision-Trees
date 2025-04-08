@@ -81,6 +81,7 @@ X[10, 0] = np.nan
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
 indiv = generate_individual()
+print(indiv)
 tree = create_tree(indiv)
 tree.fit(X_train, y_train)
 y_pred = tree.predict(X_test)

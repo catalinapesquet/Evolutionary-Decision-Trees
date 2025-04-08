@@ -63,12 +63,14 @@ class DecisionTree:
                  pruning_method=None,
                  pruning_param=None):
         self.criterion = criterion
+        self.split_criterion_obj = SplitCriterion(criterion)
         self.param = param
         self.stopping_criteria = stopping_criteria
         self.mv_classif = mv_classif
-        self.mv_handler = MissingValues(mv_split, mv_dis, mv_classif)
+        self.mv_handler = MissingValues(mv_split, mv_dis, mv_classif, split_criterion=self.split_criterion_obj)
         self.pruning_method = pruning_method
         self.pruning_param = pruning_param
+
         
     def fit(self, X, y):
         self.n_classes_ = len(np.unique(y))
@@ -126,40 +128,115 @@ class DecisionTree:
     
         return node
 
+    # def _best_split(self, X, y, n_samples, n_features):
+    #     best_gain = -1
+    #     split_idx, split_threshold = None, None
+
+    #     for feat_idx in range(n_features):
+    #         X_column = X[:, feat_idx]
+    #         # X_df = pd.DataFrame(X, columns=[str(i) for i in range(X.shape[1])])
+    #         X_df = pd.DataFrame(X, columns=list(range(X.shape[1]))) #####
+    #         X_filtered, y_filtered, X_feature_column = self.mv_handler.handle_split(X_df, y, feature=str(feat_idx))
+    #         # Check if all instances have missing value
+    #         if X_filtered.empty:
+    #             continue
+
+    #         X_column_filtered = X_feature_column.to_numpy()
+    #         thresholds = np.unique(X_column)
+
+    #         for threshold in thresholds:
+    #             left_indices_temp, right_indices_temp = self._split(X_column, threshold)
+    #             if len(left_indices_temp) == 0 or len(right_indices_temp) == 0:
+    #                 continue
+
+    #             gain = self._calculate_criterion(y, X_column, threshold)
+                    
+    #             if gain > best_gain:
+    #                 best_gain = gain
+    #                 split_idx = feat_idx
+    #                 split_threshold = threshold
+    #     if split_idx is not None:
+    #         X_original_column = pd.Series(X[:, split_idx])
+    #         left_idxs, right_idxs = self.mv_handler.apply_split_with_mv(
+    #             X_df, y, feature=str(split_idx), split_value=split_threshold
+    #         )
+    #         return split_idx, split_threshold, left_idxs, right_idxs
+    #     return None, None, None, None
+    
     def _best_split(self, X, y, n_samples, n_features):
         best_gain = -1
         split_idx, split_threshold = None, None
-
+    
+        # Prépare un DataFrame avec colonnes en int
+        X_df = pd.DataFrame(X, columns=list(range(X.shape[1])))
+    
         for feat_idx in range(n_features):
             X_column = X[:, feat_idx]
-            X_df = pd.DataFrame(X, columns=[str(i) for i in range(X.shape[1])])
-            X_filtered, y_filtered, X_feature_column = self.mv_handler.handle_split(X_df, y, feature=str(feat_idx))
-            # Check if all instances have missing value
-            if X_filtered.empty:
-                continue
-
-            X_column_filtered = X_feature_column.to_numpy()
-            thresholds = np.unique(X_column)
-
-            for threshold in thresholds:
-                left_indices_temp, right_indices_temp = self._split(X_column, threshold)
-                if len(left_indices_temp) == 0 or len(right_indices_temp) == 0:
+    
+            # ⚠️ Cas spécial : weight_split (retourne un float)
+            if self.mv_handler.mv_split == 'weight_split':
+                thresholds = np.unique(X_column)
+    
+                for threshold in thresholds:
+                    left_indices_temp, right_indices_temp = self._split(X_column, threshold)
+                    if len(left_indices_temp) == 0 or len(right_indices_temp) == 0:
+                        continue
+    
+                    gain = self.mv_handler.weight_split(X_df, y, feat_idx)
+    
+                    if gain > best_gain:
+                        best_gain = gain
+                        split_idx = feat_idx
+                        split_threshold = threshold
+    
+            else:
+                # 🎯 Cas général : autres stratégies
+                try:
+                    X_filtered, y_filtered, X_feature_column = self.mv_handler.handle_split(
+                        X_df, y, feature=feat_idx
+                    )
+                except Exception as e:
+                    print(f"Erreur avec handle_split sur feature {feat_idx}: {e}")
                     continue
-
-                gain = self._calculate_criterion(y, X_column, threshold)
-                    
-                if gain > best_gain:
-                    best_gain = gain
-                    split_idx = feat_idx
-                    split_threshold = threshold
+    
+                # Skip si données trop manquantes
+                if X_filtered.empty or len(y_filtered) == 0:
+                    continue
+    
+                X_column_filtered = X_feature_column.to_numpy()
+                thresholds = np.unique(X_column_filtered)
+    
+                for threshold in thresholds:
+                    # 💡 Crée des masques booléens
+                    left_mask = X_column_filtered <= threshold
+                    right_mask = X_column_filtered > threshold
+    
+                    if left_mask.sum() == 0 or right_mask.sum() == 0:
+                        continue
+    
+                    y_left = y_filtered[left_mask]
+                    y_right = y_filtered[right_mask]
+    
+                    if len(y_left) == 0 or len(y_right) == 0:
+                        continue
+    
+                    gain = self._calculate_criterion(y_filtered, X_column_filtered, threshold)
+    
+                    if gain > best_gain:
+                        best_gain = gain
+                        split_idx = feat_idx
+                        split_threshold = threshold
+    
+        # 🔁 Applique le meilleur split trouvé
         if split_idx is not None:
-            X_original_column = pd.Series(X[:, split_idx])
             left_idxs, right_idxs = self.mv_handler.apply_split_with_mv(
-                X_df, y, feature=str(split_idx), split_value=split_threshold
+                X_df, y, feature=split_idx, split_value=split_threshold
             )
             return split_idx, split_threshold, left_idxs, right_idxs
+    
         return None, None, None, None
-
+    
+        
     def _calculate_criterion(self, y, X_column, threshold):
         criterion = SplitCriterion(self.criterion)
         return criterion.calculate(y, X_column, threshold)
@@ -217,15 +294,15 @@ X[10, 0] = np.nan
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
 # With REP pruning
-tree_with_prune = DecisionTree(criterion='gini', 
-                                stopping_criteria='max_depth',
-                                param=40, 
-                                mv_split='impute_mv',
-                                mv_dis='most_probable_partition',
-                                mv_classif='explore_all',
-                                pruning_method='MEP',
-                                pruning_param=20)  
-tree_with_prune.fit(X_train, y_train)
-y_pred_rep = tree_with_prune.predict(X_test)
+tree = DecisionTree(criterion='g_stat', 
+                    stopping_criteria='max_depth',
+                    param=40, 
+                    mv_split='ignore_all',
+                    mv_dis='most_probable_partition',
+                    mv_classif='explore_all',
+                    pruning_method='MEP',
+                    pruning_param=20)  
+tree.fit(X_train, y_train)
+y_pred_rep = tree.predict(X_test)
 acc_rep = accuracy_score(y_test, y_pred_rep)
-print(f"Accuracy with PEP pruning : {acc_rep:.4f}")
+print(f"Accuracy: {acc_rep:.4f}")

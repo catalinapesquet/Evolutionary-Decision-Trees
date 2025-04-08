@@ -338,11 +338,11 @@ def ORT(y, X_column, threshold):
 def twoing(y, X_column, threshold):
     left_indices = X_column <= threshold
     right_indices = X_column > threshold
-    left = y[L_indices]
-    right = y[R_indices]
+    left = y[left_indices]
+    right = y[right_indices]
 
     # Check if one group is empty. If so, PL or PR will be 0, making the twoing criterion 0.
-    if len(L) == 0 or len(R) == 0:
+    if len(left) == 0 or len(right) == 0:
         return 0.0
 
     n_total = len(y)
@@ -359,8 +359,8 @@ def twoing(y, X_column, threshold):
     # Calculate Pj,L and Pj,R for each class and the sum of absolute differences
     diff_sum = 0
     for c in classes:
-        Pj_L = np.sum(L == c) / n_L if n_L > 0 else 0
-        Pj_R = np.sum(R == c) / n_R if n_R > 0 else 0
+        Pj_L = np.sum(left == c) / n_L if n_L > 0 else 0
+        Pj_R = np.sum(right == c) / n_R if n_R > 0 else 0
         diff_sum += np.abs(Pj_L - Pj_R)
 
     # Calculate the twoing criterion: PLPR * [Σⱼ |Pⱼ,L - Pⱼ,R|]²
