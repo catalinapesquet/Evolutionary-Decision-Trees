@@ -29,6 +29,7 @@ from collections import defaultdict
 from sklearn.datasets import load_iris
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
+from scipy.special import gammaln
 
 class DecisionTree:
     """
@@ -127,41 +128,6 @@ class DecisionTree:
         node.right_weight = len(right_idxs) / (len(left_idxs) + len(right_idxs))
     
         return node
-
-    # def _best_split(self, X, y, n_samples, n_features):
-    #     best_gain = -1
-    #     split_idx, split_threshold = None, None
-
-    #     for feat_idx in range(n_features):
-    #         X_column = X[:, feat_idx]
-    #         # X_df = pd.DataFrame(X, columns=[str(i) for i in range(X.shape[1])])
-    #         X_df = pd.DataFrame(X, columns=list(range(X.shape[1]))) #####
-    #         X_filtered, y_filtered, X_feature_column = self.mv_handler.handle_split(X_df, y, feature=str(feat_idx))
-    #         # Check if all instances have missing value
-    #         if X_filtered.empty:
-    #             continue
-
-    #         X_column_filtered = X_feature_column.to_numpy()
-    #         thresholds = np.unique(X_column)
-
-    #         for threshold in thresholds:
-    #             left_indices_temp, right_indices_temp = self._split(X_column, threshold)
-    #             if len(left_indices_temp) == 0 or len(right_indices_temp) == 0:
-    #                 continue
-
-    #             gain = self._calculate_criterion(y, X_column, threshold)
-                    
-    #             if gain > best_gain:
-    #                 best_gain = gain
-    #                 split_idx = feat_idx
-    #                 split_threshold = threshold
-    #     if split_idx is not None:
-    #         X_original_column = pd.Series(X[:, split_idx])
-    #         left_idxs, right_idxs = self.mv_handler.apply_split_with_mv(
-    #             X_df, y, feature=str(split_idx), split_value=split_threshold
-    #         )
-    #         return split_idx, split_threshold, left_idxs, right_idxs
-    #     return None, None, None, None
     
     def _best_split(self, X, y, n_samples, n_features):
         best_gain = -1
@@ -283,26 +249,39 @@ class Node:
         self.leaf_value = value if is_leaf else None
         self.majority_class = value  # toujours défini
 
-# Testing on a well known dataset
-iris= load_iris()
-X, y = iris.data, iris.target
-# Introduce missing values 
-X[1, 2] = np.nan
-X[3, 2] = np.nan
-X[5, 1] = np.nan
-X[10, 0] = np.nan
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+def print_tree(node, depth=0):
+    indent = "  " * depth
+    if node.is_leaf:
+        print(f"{indent}Leaf → Predict class: {node.leaf_value}")
+    else:
+        print(f"{indent}Feature {node.feat_idx} ≤ {node.threshold}")
+        print(f"{indent}├─ Left:")
+        print_tree(node.left, depth + 1)
+        print(f"{indent}└─ Right:")
+        print_tree(node.right, depth + 1)
 
-# With REP pruning
-tree = DecisionTree(criterion='g_stat', 
-                    stopping_criteria='max_depth',
-                    param=40, 
-                    mv_split='ignore_all',
-                    mv_dis='most_probable_partition',
-                    mv_classif='explore_all',
-                    pruning_method='MEP',
-                    pruning_param=20)  
-tree.fit(X_train, y_train)
-y_pred_rep = tree.predict(X_test)
-acc_rep = accuracy_score(y_test, y_pred_rep)
-print(f"Accuracy: {acc_rep:.4f}")
+# # Testing on a well known dataset
+# iris= load_iris()
+# X, y = iris.data, iris.target
+# # Introduce missing values 
+# X[1, 2] = np.nan
+# X[3, 2] = np.nan
+# X[5, 1] = np.nan
+# X[10, 0] = np.nan
+# X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+
+# # With REP pruning
+# tree = DecisionTree(criterion='gini', 
+#                     stopping_criteria='max_depth',
+#                     param=40, 
+#                     mv_split='ignore_all',
+#                     mv_dis='ignore_all',
+#                     mv_classif='explore_all',
+#                     pruning_method='REP',
+#                     pruning_param=20)  
+# tree.fit(X_train, y_train)
+# y_pred_rep = tree.predict(X_test)
+# acc_rep = accuracy_score(y_test, y_pred_rep)
+# print(f"Accuracy: {acc_rep:.4f}")
+# print_tree(tree.tree_)
+
