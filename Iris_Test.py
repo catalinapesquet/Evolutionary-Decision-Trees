@@ -37,7 +37,7 @@ my_tree = DecisionTree(
 my_tree.fit(X,y)
 
 # print("\n Sklearn DT:\n")
-# print(export_text(sk_tree))
+print(export_text(sk_tree))
 
 # print("\n Custom DT:\n")
-# print_tree(my_tree.tree_)
+print_tree(my_tree.tree_)
