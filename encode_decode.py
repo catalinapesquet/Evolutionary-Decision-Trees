@@ -77,14 +77,14 @@ def decode(gene_list):
 
 # iris= load_iris()
 # X, y = iris.data, iris.target
-# Introduce missing values 
+# # Introduce missing values 
 # X[1, 2] = np.nan
 # X[3, 2] = np.nan
 # X[5, 1] = np.nan
 # X[10, 0] = np.nan
 # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
-# indiv = generate_individual()
+# indiv = [12, 2, 13, 0, 3, 0, 2, 44]
 # print(indiv)
 # tree = decode(indiv)
 # tree.fit(X_train, y_train)
