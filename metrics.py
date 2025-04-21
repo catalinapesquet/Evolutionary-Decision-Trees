@@ -20,7 +20,9 @@ def count_nodes(node):
     return 1 + count_nodes(node.left) + count_nodes(node.right)
 
 # Evaluates tree with chosen metric (f1, specificity, recall)
-def evaluate_tree(tree, X_test, y_test):
+def evaluate_tree(tree, X_train, y_train, X_test, y_test):
+    tree.fit(X_train, y_train)
+    
     y_pred = tree.predict(X_test)
 
     f1 = f1_score(y_test, y_pred, average='macro')

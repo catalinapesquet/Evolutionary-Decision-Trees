@@ -35,10 +35,10 @@ class TreeProblem(ElementwiseProblem):
     def _evaluate(self, x, out, *args, **kwargs):
         try:
             # Decode tree
-            tree = decode(x)
+            tree = decode(x) # create decision tree algorithm with genotype
             
             # Training + evaluation
-            metrics = evaluate_tree(tree, self.X_test, self.y_test)
+            metrics = evaluate_tree(tree, self.X_train, self.y_train, self.X_test, self.y_test)
             
             # Extract chosen objectives
             values = []
@@ -46,9 +46,9 @@ class TreeProblem(ElementwiseProblem):
                 val = metrics[obj]
                 # Check if the metrics is to be maximized 
                 if obj in ['f1', 'recall', 'specificity']:
-                    values.append(1 - val)
+                    values.append(1 - val) # need to maximise those
                 else: 
-                    values.append(val)
+                    values.append(val) # need to minimize number of nodes
             
             # Objectives to minimize
             out["F"] = values
@@ -64,7 +64,7 @@ from sklearn.datasets import load_iris
 iris = load_iris()
 X, y = iris.data, iris.target
 X_meta_train, X_meta_test, y_meta_train, y_meta_test = train_test_split(X, y, train_size=0.9)
-X_train, X_test, y_train, y_test = train_test_split(X_meta_train, y_meta_train)
+X_train, X_test, y_train, y_test = train_test_split(X_meta_train, y_meta_train, train_size=0.7)
 problem = TreeProblem(
     X_train=X_train,
     y_train=y_train,

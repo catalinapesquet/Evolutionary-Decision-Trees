@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from copy import deepcopy
 from sklearn.model_selection import train_test_split
+from scipy.stats import norm
 
 class Pruning:
     def __init__(self, method=None, param=None):
@@ -65,6 +66,13 @@ class Pruning:
                 reachable_y.append(yi)
 
         return np.array(reachable_X), np.array(reachable_y)
+    
+    def _count_leaves(self, n):
+        if n is None:
+            return 0
+        if n.is_leaf:
+            return 1
+        return self._count_leaves(n.left) + self._count_leaves(n.right)
     
     # Gene 0: REP
     def _REP(self, tree, X, y):
@@ -133,14 +141,7 @@ class Pruning:
             return node
         
         errors_subtree = np.sum([self._predict_from_node(node, x) != y for x, y in zip(X_node, y_node)])
-        def count_leaves(n):
-            if n is None:
-                return 0
-            if n.is_leaf:
-                return 1
-            return count_leaves(n.left) + count_leaves(n.right)
-
-        nb_leaves = count_leaves(node)
+        nb_leaves = self._count_leaves(node)
 
         # Apply SE correction dynamically based on self.param
         mapping = [0.5, 1.0, 1.5, 2.0]
@@ -206,7 +207,8 @@ class Pruning:
             node.leaf_value = majority_class
     
         return node
-
+    
+    # Gene 3: CCP
     def _CCP(self, tree, X, y):
         val_size = min(max(self.param / 100.0, 0.1), 0.5)
         X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=val_size, stratify=y)
@@ -232,6 +234,74 @@ class Pruning:
             sequence.append(deepcopy(tree))
         return sequence
     
-    def EBP(self, tree, X, y):
-        pass
+    def _collect_alpha(self, root, node, X, y, candidates):
+        if node is None or node.is_leaf:
+            return
+        X_node, y_node = self._collect_reachable_examples(root, node, X, y)
+        if len(y_node) == 0:
+            return
+        error_Tt = np.sum([self._predict_from_node(node, x) != y for x, y in zip(X_node, y_node)])
+        majority_class = max(set(y_node), key=list(y_node).count)
+        error_t = np.sum(y_node != majority_class)
+        leaves_Tt = self._count_leaves(node)
+        if leaves_Tt > 1:
+            alpha = (error_t - error_Tt) / (leaves_Tt - 1)
+            candidates.append({'node': node, 'alpha': alpha})
+        self._collect_alpha(root, node.left, X, y, candidates)
+        self._collect_alpha(root, node.right, X, y, candidates)
+        
+    def _select_best_ccp_tree(self, sequence, X_val, y_val):
+        mapping = [0.5, 1.0, 1.5, 2.0]
+        index = min(int(self.param / 25), 3)
+        se = mapping[index]
+        errors = [self._evaluate_error(t, X_val, y_val) for t in sequence]
+        best_error = min(errors)
+        std_error = np.std(errors)
+        for tree, error in zip(sequence, errors):
+            if error <= best_error + se * std_error:
+                return tree
+        return sequence[-1]  # fallback
+    
+    # Gene 4: EBP
+    def _EBP(self, tree, X, y):
+        """ Error-Based Pruning """
+        val_size = min(max(self.param / 100.0, 0.1), 0.5)
+        X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=val_size, stratify=y)
+
+        cf = max(min(self.param / 100, 0.5), 0.01)  # CF in [0.01, 0.5]
+        z = norm.ppf(1 - cf)  # critical value for binomial upper bound
+
+        self._prune_node_ebp(tree, tree, X_val, y_val, z)
+        return tree
+
+    def _prune_node_ebp(self, node, tree, X_val, y_val, z):
+        if node is None or node.is_leaf:
+            return node
+
+        node.left = self._prune_node_ebp(node.left, tree, X_val, y_val, z)
+        node.right = self._prune_node_ebp(node.right, tree, X_val, y_val, z)
+
+        X_node, y_node = self._collect_reachable_examples(tree, node, X_val, y_val)
+        if len(y_node) == 0:
+            return node
+
+        majority_class = max(set(y_node), key=list(y_node).count)
+        errors_leaf = np.sum(y_node != majority_class)
+        n = len(y_node)
+        p_hat = errors_leaf / n
+
+        err_leaf = p_hat + z * np.sqrt(p_hat * (1 - p_hat) / n)
+
+        errors_subtree = np.sum([self._predict_from_node(node, x) != y for x, y in zip(X_node, y_node)])
+        p_hat_sub = errors_subtree / n
+        err_subtree = p_hat_sub + z * np.sqrt(p_hat_sub * (1 - p_hat_sub) / n)
+
+        # Décision
+        if err_leaf <= err_subtree:
+            node.left = None
+            node.right = None
+            node.is_leaf = True
+            node.leaf_value = majority_class
+
+        return node
     
