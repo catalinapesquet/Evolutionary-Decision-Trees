@@ -62,7 +62,8 @@ class DecisionTree:
                  mv_dis='ignore_all', 
                  mv_classif='explore_all',
                  pruning_method=None,
-                 pruning_param=None):
+                 pruning_param=None,
+                 min_samples_split=1):
         self.criterion = criterion
         self.split_criterion_obj = SplitCriterion(criterion)
         self.param = param
@@ -71,6 +72,7 @@ class DecisionTree:
         self.mv_handler = MissingValues(mv_split, mv_dis, mv_classif, split_criterion=self.split_criterion_obj)
         self.pruning_method = pruning_method
         self.pruning_param = pruning_param
+        self.min_samples_split = min_samples_split
 
         
     def fit(self, X, y):
@@ -81,8 +83,11 @@ class DecisionTree:
         self.stopping_criteria = StoppingCriterion(n_tot_samples = n_tot_samples, 
                                                    criterion=self.stopping_criteria, 
                                                    param=self.param)
+        # Train the tree recursively
         self.tree_ = self._grow_tree(X, y, n_tot_samples)
         
+        # Post-process the tree to remove useless splits
+        self.tree_ = self._simplify_tree(self.tree_)
         
         if self.pruning_method is not None:
             pruner = Pruning(self.pruning_method, self.pruning_param)
@@ -129,57 +134,84 @@ class DecisionTree:
     
         return node
     
+    def _simplify_tree(self, node):
+        # If the node is a leaf, no simplification needed
+        if node.is_leaf:
+            return node
+        # Simplify left and right subtrees
+        node.left = self._simplify_tree(node.left)
+        node.right = self._simplify_tree(node.right)
+    
+        # If both children are leaves and predict the same class, collapse this node
+        if node.left.is_leaf and node.right.is_leaf:
+            if node.left.leaf_value == node.right.leaf_value:
+                return Node(
+                    is_leaf=True,
+                    value=node.left.leaf_value,
+                )
+        # Otherwise, keep the current node
+        return node
+        
     def _best_split(self, X, y, n_samples, n_features):
         best_gain = -1
         split_idx, split_threshold = None, None
+        left_idxs, right_idxs = None, None  # NEW
     
-        # Prépare un DataFrame avec colonnes en int
+        # Prepares data frame
         X_df = pd.DataFrame(X, columns=list(range(X.shape[1])))
     
         for feat_idx in range(n_features):
             X_column = X[:, feat_idx]
     
-            # ⚠️ Cas spécial : weight_split (retourne un float)
+            # Special case: weight split
             if self.mv_handler.mv_split == 'weight_split':
                 thresholds = np.unique(X_column)
-    
                 for threshold in thresholds:
                     left_indices_temp, right_indices_temp = self._split(X_column, threshold)
                     if len(left_indices_temp) == 0 or len(right_indices_temp) == 0:
                         continue
     
                     gain = self.mv_handler.weight_split(X_df, y, feat_idx)
+                    if gain <= 0:
+                        continue
     
-                    if gain > best_gain:
+                    if gain > best_gain or (gain == best_gain and split_idx is None):
                         best_gain = gain
                         split_idx = feat_idx
                         split_threshold = threshold
+                        left_idxs = left_indices_temp
+                        right_idxs = right_indices_temp
     
             else:
-                # 🎯 Cas général : autres stratégies
                 try:
                     X_filtered, y_filtered, X_feature_column = self.mv_handler.handle_split(
                         X_df, y, feature=feat_idx
                     )
                 except Exception as e:
-                    print(f"Erreur avec handle_split sur feature {feat_idx}: {e}")
+                    print(f"Error with handle_split on feature {feat_idx}: {e}")
                     continue
     
-                # Skip si données trop manquantes
                 if X_filtered.empty or len(y_filtered) == 0:
                     continue
     
                 X_column_filtered = X_feature_column.to_numpy()
-                thresholds = np.unique(X_column_filtered)
+                vals = np.sort(np.unique(X_column_filtered))
+                if len(vals) < 2:
+                    continue 
+                # print("Valeurs uniques dans X_column_filtered:", np.sort(np.unique(X_column_filtered)))
+
+                thresholds = (vals[:-1] + vals[1:]) / 2  # midpoints between values (like in scikit learn)
     
                 for threshold in thresholds:
-                    # 💡 Crée des masques booléens
                     left_mask = X_column_filtered <= threshold
                     right_mask = X_column_filtered > threshold
     
                     if left_mask.sum() == 0 or right_mask.sum() == 0:
                         continue
-    
+                    
+                    if left_mask.sum() < self.min_samples_split or right_mask.sum() < self.min_samples_split:
+                        continue
+
                     y_left = y_filtered[left_mask]
                     y_right = y_filtered[right_mask]
     
@@ -187,20 +219,31 @@ class DecisionTree:
                         continue
     
                     gain = self._calculate_criterion(y_filtered, X_column_filtered, threshold)
+                    
+                    # DEBUGGING
+                    # print(f"Tested split - Feature {feat_idx} | Threshold: {threshold:.2f} | Gain: {gain:.4f}")
+                    
+                    if gain <= 0:
+                        continue
     
-                    if gain > best_gain:
+                    if gain > best_gain or (gain == best_gain and split_idx is None):
                         best_gain = gain
                         split_idx = feat_idx
                         split_threshold = threshold
+        
+                        mask = X_column_filtered <= threshold
+                        left_idxs = X_filtered[mask].index.to_numpy()
+                        right_idxs = X_filtered[~mask].index.to_numpy()
     
-        # 🔁 Applique le meilleur split trouvé
         if split_idx is not None:
-            left_idxs, right_idxs = self.mv_handler.apply_split_with_mv(
-                X_df, y, feature=split_idx, split_value=split_threshold
-            )
+            # DEBUGGING
+            # print(f"✅ Selected split: Feature {split_idx} | Threshold: {split_threshold} | Gain: {best_gain:.4f}")
             return split_idx, split_threshold, left_idxs, right_idxs
-    
+        
+        # DEBUGGING
+        # print(f"⛔️ No valid split found.")
         return None, None, None, None
+
     
         
     def _calculate_criterion(self, y, X_column, threshold):
@@ -239,6 +282,7 @@ class DecisionTree:
         else:
             raise ValueError(f"Unknown mv_classification strategy: {self.mv_classif}")
     
+    
 class Node:
     def __init__(self, feat_idx=None, threshold=None, left=None, right=None, value=None, is_leaf=False):
         self.feat_idx = feat_idx
@@ -249,39 +293,13 @@ class Node:
         self.leaf_value = value if is_leaf else None
         self.majority_class = value  # toujours défini
 
-def print_tree(node, depth=0):
-    indent = "  " * depth
+def print_tree(node, depth=0, prefix=""):
+    indent = "|   " * depth
     if node.is_leaf:
-        print(f"{indent}Leaf → Predict class: {node.leaf_value}")
+        print(f"{indent}|--- class: {node.leaf_value}")
     else:
-        print(f"{indent}Feature {node.feat_idx} ≤ {node.threshold}")
-        print(f"{indent}├─ Left:")
+        print(f"{indent}|--- feature_{node.feat_idx} <= {node.threshold:.2f}")
         print_tree(node.left, depth + 1)
-        print(f"{indent}└─ Right:")
+        print(f"{indent}|--- feature_{node.feat_idx} >  {node.threshold:.2f}")
         print_tree(node.right, depth + 1)
-
-# # Testing on a well known dataset
-# iris= load_iris()
-# X, y = iris.data, iris.target
-# # Introduce missing values 
-# X[1, 2] = np.nan
-# X[3, 2] = np.nan
-# X[5, 1] = np.nan
-# X[10, 0] = np.nan
-# X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
-
-# # With REP pruning
-# tree = DecisionTree(criterion='gini', 
-#                     stopping_criteria='max_depth',
-#                     param=40, 
-#                     mv_split='ignore_all',
-#                     mv_dis='ignore_all',
-#                     mv_classif='explore_all',
-#                     pruning_method='REP',
-#                     pruning_param=20)  
-# tree.fit(X_train, y_train)
-# y_pred_rep = tree.predict(X_test)
-# acc_rep = accuracy_score(y_test, y_pred_rep)
-# print(f"Accuracy: {acc_rep:.4f}")
-# print_tree(tree.tree_)
 
