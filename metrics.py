@@ -22,7 +22,6 @@ def count_nodes(node):
 # Evaluates tree with chosen metric (f1, specificity, recall)
 def evaluate_tree(tree, X_train, y_train, X_test, y_test):
     tree.fit(X_train, y_train)
-    
     y_pred = tree.predict(X_test)
 
     f1 = f1_score(y_test, y_pred, average='macro')
@@ -43,3 +42,27 @@ def evaluate_tree(tree, X_train, y_train, X_test, y_test):
         "specificity": specificity,
         "n_nodes": n_nodes
     }
+
+
+            
+from sklearn.datasets import load_iris
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+from encode_decode import generate_individual
+
+iris= load_iris()
+X, y = iris.data, iris.target
+# Introduce missing values 
+# X[1, 2] = np.nan
+# X[3, 2] = np.nan
+# X[5, 1] = np.nan
+# X[10, 0] = np.nan
+# X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+
+# indiv = [ 2,  4, 63,  2,  1,  1,  1, 21]
+# print(indiv)
+# tree = decode(indiv)
+# tree.fit(X_train, y_train)
+# print(tree.tree_)
+# metrics = evaluate_tree(tree, X_train, y_train, X_test, y_test)
+# print(metrics)

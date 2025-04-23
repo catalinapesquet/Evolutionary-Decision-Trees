@@ -84,7 +84,7 @@ def decode(gene_list):
 # X[10, 0] = np.nan
 # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
-# indiv = [12, 2, 13, 0, 3, 0, 2, 44]
+# indiv = generate_individual()
 # print(indiv)
 # tree = decode(indiv)
 # tree.fit(X_train, y_train)

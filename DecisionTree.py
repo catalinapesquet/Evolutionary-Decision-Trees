@@ -171,7 +171,8 @@ class DecisionTree:
                     if len(left_indices_temp) == 0 or len(right_indices_temp) == 0:
                         continue
     
-                    gain = self.mv_handler.weight_split(X_df, y, feat_idx)
+                    gain = self.mv_handler.weight_split(X_df, y, feat_idx, threshold)
+                    
                     if gain <= 0:
                         continue
     

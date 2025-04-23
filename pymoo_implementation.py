@@ -13,9 +13,10 @@ import numpy as np
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.operators.crossover.sbx import SBX
 from pymoo.operators.mutation.pm import PM
-from pymoo.operators.sampling.rnd import FloatRandomSampling
+from pymoo.operators.sampling.rnd import IntegerRandomSampling
 from pymoo.termination import get_termination
 from pymoo.optimize import minimize
+from pymoo.operators.mutation.rm import ChoiceRandomMutation
 
 class TreeProblem(ElementwiseProblem):
     def __init__(self, X_train, y_train, X_test, y_test, objectives):
@@ -34,12 +35,13 @@ class TreeProblem(ElementwiseProblem):
     
     def _evaluate(self, x, out, *args, **kwargs):
         try:
-            # Decode tree
-            tree = decode(x) # create decision tree algorithm with genotype
-            
-            # Training + evaluation
+            # Decode tree from genotype
+            # print("Évaluation de :", x.tolist())
+            print(f'x = {x}')
+            tree = decode(x.tolist())
+ 
             metrics = evaluate_tree(tree, self.X_train, self.y_train, self.X_test, self.y_test)
-            
+            print(f'metrics = {metrics}')
             # Extract chosen objectives
             values = []
             for obj in self.selected_objectives:
@@ -54,9 +56,9 @@ class TreeProblem(ElementwiseProblem):
             out["F"] = values
             
         except Exception as e:
+            print(f"Error for x = {x} : {e}", flush=True)
             # In case of fail in the construction of the tree
             out["F"] = [1.0, 999]
-
 
 from sklearn.model_selection import train_test_split
 from sklearn.datasets import load_iris
@@ -72,12 +74,32 @@ problem = TreeProblem(
     y_test=y_test,
     objectives=["recall", "specificity"]  
 )
-algorithm = NSGA2(pop_size=100)
-termination = get_termination("n_gen", 50)
+
+
+
+termination = get_termination("n_gen", 10)
+
+choices = [
+    list(range(13)),  # SPLIT_CRITERIA
+    list(range(5)),   # STOPPING_CRITERIA
+    list(range(101)),  # STOPPING_PARAM
+    list(range(4)),   # MV_SPLIT
+    list(range(7)),   # MV_DISTRIBUTION
+    list(range(2)),   # MV_CLASSIF
+    list(range(6)),   # PRUNING_STRATEGY
+    list(range(101))  # PRUNING_PARAM
+]
+
+
+mutation = mutation = ChoiceRandomMutation(choices=choices)
+
+algorithm = NSGA2(pop_size=20,
+                  sampling=IntegerRandomSampling(),
+                  mutation=mutation)
 
 res = minimize(problem,
                algorithm,
                termination,
-               seed=42,
+               seed=40,
                verbose=True)
         
