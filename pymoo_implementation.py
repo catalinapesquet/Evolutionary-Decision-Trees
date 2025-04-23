@@ -36,7 +36,7 @@ class TreeProblem(ElementwiseProblem):
                     "gene_6": Choice(options=np.arange(6)),   # pruning strategy
                     "gene_7": Choice(options=np.arange(101))  # pruning parameter
                 }
-        super().__init__(vars=vars, n_obj=2)
+        super().__init__(vars=vars, n_obj=3)
     
     def _evaluate(self, x, out, *args, **kwargs):
         try:
@@ -45,7 +45,7 @@ class TreeProblem(ElementwiseProblem):
             tree = decode(x.tolist())
  
             metrics = evaluate_tree(tree, self.X_train, self.y_train, self.X_test, self.y_test)
-            print(f'metrics = {metrics}')
+            # print(f'metrics = {metrics}')
             # Extract chosen objectives
             values = []
             for obj in self.selected_objectives:
@@ -76,12 +76,12 @@ problem = TreeProblem(
     y_train=y_train,
     X_test=X_test,
     y_test=y_test,
-    objectives=["recall", "f1"]  
+    objectives=["recall", "f1", "n_nodes"]  
 )
 
 
 
-termination = get_termination("n_gen", 10)
+termination = get_termination("n_gen", 20)
 
 choices = [
     list(range(13)),  # SPLIT_CRITERIA
@@ -94,7 +94,7 @@ choices = [
     list(range(101))  # PRUNING_PARAM
 ]
 
-algorithm = NSGA2(pop_size=20,
+algorithm = NSGA2(pop_size=100,
                   sampling=ChoiceRandomSampling(),
                   crossover=UniformCrossover(),
                   mutation=ChoiceRandomMutation(),
@@ -105,4 +105,3 @@ res = minimize(problem,
                termination,
                seed=40,
                verbose=True)
-        
