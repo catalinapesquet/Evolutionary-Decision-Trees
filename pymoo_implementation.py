@@ -11,12 +11,12 @@ from metrics import evaluate_tree
 import numpy as np
 
 from pymoo.algorithms.moo.nsga2 import NSGA2
-from pymoo.operators.crossover.sbx import SBX
-from pymoo.operators.mutation.pm import PM
-from pymoo.operators.sampling.rnd import IntegerRandomSampling
+from pymoo.operators.crossover.ux import UniformCrossover
 from pymoo.termination import get_termination
 from pymoo.optimize import minimize
 from pymoo.operators.mutation.rm import ChoiceRandomMutation
+from pymoo.core.variable import Choice
+from choice_sampling import ChoiceRandomSampling
 
 class TreeProblem(ElementwiseProblem):
     def __init__(self, X_train, y_train, X_test, y_test, objectives):
@@ -25,19 +25,23 @@ class TreeProblem(ElementwiseProblem):
         self.X_test = X_test
         self.y_test = y_test
         self.selected_objectives = objectives
-        super().__init__(
-            n_var=8,
-            n_obj=2,
-            xl=np.array([0, 0, 0, 0, 0, 0, 0, 0]),
-            xu=np.array([12, 4, 100, 3, 6, 1, 5, 100]),
-            type_var=np.int32
-            )
+        
+        vars = {
+                    "gene_0": Choice(options=np.arange(13)),  # split criteria
+                    "gene_1": Choice(options=np.arange(5)),   # stopping criteria
+                    "gene_2": Choice(options=np.arange(101)), # stopping parameter
+                    "gene_3": Choice(options=np.arange(4)),   # missing value split 
+                    "gene_4": Choice(options=np.arange(7)),   # missing value distribution
+                    "gene_5": Choice(options=np.arange(2)),   # missing value classification
+                    "gene_6": Choice(options=np.arange(6)),   # pruning strategy
+                    "gene_7": Choice(options=np.arange(101))  # pruning parameter
+                }
+        super().__init__(vars=vars, n_obj=2)
     
     def _evaluate(self, x, out, *args, **kwargs):
         try:
             # Decode tree from genotype
             # print("Évaluation de :", x.tolist())
-            print(f'x = {x}')
             tree = decode(x.tolist())
  
             metrics = evaluate_tree(tree, self.X_train, self.y_train, self.X_test, self.y_test)
@@ -72,7 +76,7 @@ problem = TreeProblem(
     y_train=y_train,
     X_test=X_test,
     y_test=y_test,
-    objectives=["recall", "specificity"]  
+    objectives=["recall", "f1"]  
 )
 
 
@@ -90,12 +94,11 @@ choices = [
     list(range(101))  # PRUNING_PARAM
 ]
 
-
-mutation = mutation = ChoiceRandomMutation(choices=choices)
-
 algorithm = NSGA2(pop_size=20,
-                  sampling=IntegerRandomSampling(),
-                  mutation=mutation)
+                  sampling=ChoiceRandomSampling(),
+                  crossover=UniformCrossover(),
+                  mutation=ChoiceRandomMutation(),
+                  eliminate_duplicates=True)
 
 res = minimize(problem,
                algorithm,
