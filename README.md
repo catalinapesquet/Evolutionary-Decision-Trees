@@ -1,7 +1,9 @@
-Evolutionary Decision Tree Induction Algorithms
+# Scientific Context
+This project is inspired by the work of Márcio Basgalupp, Rodrigo Barros, and Vili Podgorelec, "Evolving Decision-Tree Induction Algorithms with a Multi-Objective Hyper-Heuristic" (SAC 2015)​057 Evolving decision-t….
+Their research introduced a hyper-heuristic evolutionary framework capable of automatically designing decision-tree induction algorithms, balancing predictive performance and model complexity through multi-objective optimization.
 
-Automatic design of interpretable and efficient decision tree algorithms using evolutionary computation.
+Building on these foundations, our project aims to extend and adapt these ideas to create evolutionary decision-tree induction algorithms that are not specialized for a single dataset, but rather designed to perform well across a group of datasets within the same application domain.
 
-This project tackles the problem of automatically designing decision-tree induction algorithms using evolutionary algorithms (EAs). Each individual in the population represents a candidate algorithm encoded as a linear genome of nine genes, each controlling one core aspect of the tree induction process.
+The primary goal is to evolve general-purpose, robust, and comprehensible decision-tree induction algorithms tailored to specific fields of application, while maintaining high predictive performance and controlled model complexity.
 
-The aim is to balance predictive performance and model simplicity, especially when evolving interpretable models in constrained or real-world scenarios.
+
