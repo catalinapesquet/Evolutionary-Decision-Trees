@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Mar 24 17:42:31 2025
+Created on Tue Apr 29 14:37:09 2025
 
-@author: Catalina
+@author: Aurora
 """
+
 # Genes
 
 SPLIT_CRITERIA = {
@@ -28,8 +29,8 @@ STOPPING_CRITERIA = {
     0: "homogeneity",
     1: "max_depth",
     2: "min_samples_split",
-    3: "min_portion_split",
-    4: "predictive_accuracy"
+    # 3: "min_portion_split",
+    3: "predictive_accuracy"
     }
 
 MV_SPLIT = {
@@ -63,4 +64,3 @@ PRUNNING_GENES = {
     4: "REP",
     5: "EBP"
     }
-
