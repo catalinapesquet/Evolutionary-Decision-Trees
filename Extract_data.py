@@ -68,8 +68,45 @@ def extract_data(dataset):
         
     elif dataset == "arrhythmia":
         path = "C:\\Users\\Aurora\\Desktop\\DecisionTreesEA\\dataset\\datasets\\arrhythmia.data"
-        df = pd.read_csv(path, sep=";")
+        df = pd.read_csv(path, sep=",", header=None)
         
+        # Name columns
+        columns = [
+            "Age", "Sex", "Height", "Weight", "QRS duration", "P-R interval", "Q-T interval",
+            "T interval", "P interval",
+            "QRS angle", "T angle", "P angle", "QRST angle", "J angle",
+            "Heart rate",
+        ]
+        # to generate repetitive names of columns
+        def wave_cols(prefix, start):
+            labels = ["Q", "R", "S", "R'", "S'", "Nb deflections",
+                      "R ragged", "R diphasic", "P ragged", "P diphasic", "T ragged", "T diphasic"]
+            return [f"{prefix} {label}" for label in labels]
+        
+        def amplitude_cols(prefix):
+            labels = ["JJ", "Q", "R", "S", "R'", "S'", "P", "T", "QRSA", "QRSTA"]
+            return [f"{prefix} {label} amplitude" for label in labels]
+        
+        channels = ["DI", "DII", "DIII", "AVR", "AVL", "AVF", "V1", "V2", "V3", "V4", "V5", "V6"]
+        
+        for ch in channels:
+            columns.extend(wave_cols(ch, start=len(columns)))
+        
+        for ch in channels:
+            columns.extend(amplitude_cols(ch))
+        columns.append("Classes")
+        df.columns = columns
+        
+        # Encode categorial values
+        non_numeric_cols = ['T angle', 'P angle', 'QRST angle', 'J angle', 'Heart rate']
+        
+        for col in non_numeric_cols:
+            df[col] = pd.to_numeric(df[col].astype(str).str.replace('[^\d.-]', '', regex=True), errors='coerce')
+
+        # Split into features and target
+        X = df.drop(columns=["Classes"]).to_numpy()
+        y = df["Classes"].to_numpy().astype(int)
+                
     elif dataset == "audiology":
         path = "C:\\Users\\Aurora\\Desktop\\DecisionTreesEA\\dataset\\datasets\\audiology.data"
         df = pd.read_csv(path, sep=";")
@@ -88,4 +125,14 @@ def extract_data(dataset):
     
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     return X_train, X_test, y_train, y_test
-        
+
+path = "C:\\Users\\Aurora\\Desktop\\DecisionTreesEA\\dataset\\datasets\\arrhythmia.data"
+df = pd.read_csv(path, sep=",", header=None)
+columns = [
+    "Age", "Sex", "Height", "Weight", "QRS duration", "P-R interval", "Q-T interval",
+    "T interval", "P interval",
+    "QRS angle", "T angle", "P angle", "QRST angle", "J angle",
+    "Heart rate", 
+]
+
+

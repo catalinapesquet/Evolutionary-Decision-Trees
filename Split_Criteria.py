@@ -75,9 +75,11 @@ def g_stat(y, X_column, threshold):
     if np.isinf(log_denominator):
         return 1.0
     else:
-        P0 = np.exp(log_numerator - log_denominator)  # Calculate the final probability
+        log_ratio = np.clip(log_numerator - log_denominator, -700, 700)
+        P0 = np.exp(log_ratio) # Calculate the final probability
         gain = 1 - P0  # Compute the gain
         return gain
+    
     
 # Gene 4: Mantaras
 def safe_log2(x):
@@ -150,8 +152,9 @@ def hg_distribution(y, X_column, threshold):
     if log_denominator == float('inf'):
         return 1.0  
     else:
-        log_P0 = log_numerator - log_denominator
-        gain = 1 - np.exp(log_P0)
+        log_ratio = np.clip(log_numerator - log_denominator, -700, 700)
+        P0 = np.exp(log_ratio)
+        gain = 1 - P0
         return gain
 
     
