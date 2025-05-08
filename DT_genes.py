@@ -14,7 +14,7 @@ SPLIT_CRITERIA = {
     3: "mantaras",
     4: "hg_distribution",
     5: "chv_criterion",
-    6: "dcsm",
+    6: "dcsm", #?
     7: "chi_square",
     8: "mpi",
     # 10: "norm_gain", # NOT READY

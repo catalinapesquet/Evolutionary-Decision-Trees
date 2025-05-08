@@ -18,37 +18,36 @@ import matplotlib.pyplot as plt
 
 iris= load_iris()
 X, y = iris.data, iris.target
-# # Introduce missing values 
-# X[1, 2] = np.nan
-# X[3, 2] = np.nan
-# X[5, 1] = np.nan
-# X[10, 0] = np.nan
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
 # indiv = generate_individual()
 # print(indiv)
 
-# y_pred = tree.predict(X_test)
-# acc_rep = accuracy_score(y_test, y_pred)
-# print(f"Accuracy: {acc_rep:.4f}")
+# sk_tree = DecisionTreeClassifier(
+#     criterion='entropy',
+#     min_samples_split=26)
+# sk_tree.fit(X_train, y_train)
+# # print("\n Sklearn")
+# # print(export_text(sk_tree))
 
-sk_tree = DecisionTreeClassifier(
-    criterion='entropy',
-    min_samples_split=26)
-sk_tree.fit(X_train, y_train)
-# print("\n Sklearn")
-# print(export_text(sk_tree))
-
-tree_sk = decode_small([1, 1, 2, 0, 55])
-tree_sk.fit(X_train, y_train)
-# print("\n Custom DT like Sklearn")
-# print_tree(tree_sk.tree_)
-
-tree = decode([1, 2, 8, 3, 2, 1, 4, 98])
-tree.fit(X_train, y_train)
-print("\n Custom DT Result")
-print_tree(tree.tree_)
+# tree_sk = decode_small([1, 1, 2, 0, 55])
+# tree_sk.fit(X_train, y_train)
+# # print("\n Custom DT like Sklearn")
+# # print_tree(tree_sk.tree_)
 
 from metrics import count_nodes, evaluate_tree
+indiv_1 = [12, 3, 50, 0, 1, 1, 3, 20]
+tree = decode(indiv_1)
+print(f"indiv_1: {indiv_1}\n")
+print(f"\n Metrics_1 : {evaluate_tree(tree, X_train, y_train, X_test, y_test)}")
+print("\n DT_1 Result")
+print_tree(tree.tree_)
 
-print(evaluate_tree(tree, X_train, y_train, X_test, y_test))
+
+indiv_2 = [3, 3, 0, 0, 0, 0, 0, 0]
+print(f"\n indiv_2: {indiv_2} \n")
+tree = decode(indiv_2)
+print(f"\n Metrics_2 : {evaluate_tree(tree, X_train, y_train, X_test, y_test)}")
+print("\n DT_2 Result")
+print_tree(tree.tree_)
+

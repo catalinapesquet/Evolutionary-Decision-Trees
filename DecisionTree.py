@@ -155,7 +155,7 @@ class DecisionTree:
     def _best_split(self, X, y, n_samples, n_features):
         best_gain = -1
         split_idx, split_threshold = None, None
-        left_idxs, right_idxs = None, None  # NEW
+        left_idxs, right_idxs = None, None  
     
         # Prepares data frame
         X_df = pd.DataFrame(X, columns=list(range(X.shape[1])))
@@ -201,7 +201,7 @@ class DecisionTree:
                     continue 
                 # print("Valeurs uniques dans X_column_filtered:", np.sort(np.unique(X_column_filtered)))
 
-                thresholds = (vals[:-1] + vals[1:]) / 2  # midpoints between values (like in scikit learn)
+                thresholds = (vals[:-1] + vals[1:]) / 2  # midpoints between values
     
                 for threshold in thresholds:
                     left_mask = X_column_filtered <= threshold
@@ -218,7 +218,6 @@ class DecisionTree:
     
                     if len(y_left) == 0 or len(y_right) == 0:
                         continue
-    
                     gain = self._calculate_criterion(y_filtered, X_column_filtered, threshold)
                     
                     # DEBUGGING
@@ -242,7 +241,7 @@ class DecisionTree:
             return split_idx, split_threshold, left_idxs, right_idxs
         
         # DEBUGGING
-        # print(f"⛔️ No valid split found.")
+        # print("⛔️ No valid split found.")
         return None, None, None, None
 
     

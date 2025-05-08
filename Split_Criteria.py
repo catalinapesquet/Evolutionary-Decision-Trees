@@ -12,6 +12,7 @@ from scipy.stats import hypergeom
 from math import *
 from scipy.special import gammaln
 import pandas as pd
+from sklearn.preprocessing import LabelEncoder
 
 # Gene 0: Information Gain 
 def entropy(y):
@@ -19,13 +20,13 @@ def entropy(y):
     _, counts = np.unique(y, return_counts=True)
     probabilities = counts / counts.sum()
     # Calculate entropy: -sum of p * log2(p)
-    return -np.sum(probabilities * np.log2(probabilities + 1e-9))
+    return -np.sum(probabilities * np.log2(probabilities))
 
 def information_gain(y, left_indices, right_indices):
     # proportion of samples in the left split 
     p = float(len(left_indices)) / (len(left_indices) + len(right_indices))
     # return entropy reduction
-    return entropy(y) - p * entropy(y[left_indices]) - (1 - p) * entropy(y[right_indices])
+    return entropy(y) - (p * entropy(y[left_indices]) + (1 - p) * entropy(y[right_indices]))
 
 # Gene 1: Gini
 def gini(y):
@@ -47,7 +48,14 @@ def _gini_gain(y, X_column, threshold):
 
 # Gene 3: G Statistic 
 def g_stat(y, X_column, threshold):
+
+    y = np.asarray(y).ravel().astype(int)
+    
     C = len(np.unique(y))  # Number of classes
+    # print("👀 y dans g_stat:", y)
+    # print("🧾 type:", type(y), "| shape:", np.shape(y), "| dtype:", np.array(y).dtype)
+    # print("🔢 valeurs uniques:", np.unique(y))
+
     n_c = np.bincount(y)  # Count of each class in the total group
     N = len(X_column)  # Total number of elements
 
@@ -60,9 +68,9 @@ def g_stat(y, X_column, threshold):
         f_cv[c, 1] = np.sum(y[right_indices] == c)  # Count of instances of class c in the right group
 
     # Using logarithms to avoid overflow in the numerator and denominator
-    log_numerator = np.sum(np.log(np.array([factorial(count) for count in n_c]))) + np.sum(np.log(np.array([factorial(count) for count in m_v])))
-    log_denominator = np.log(factorial(N)) + np.sum(np.log(np.array([factorial(f_cv[c, v]) for v in range(2) for c in range(C)])))
-
+    log_numerator = np.sum(gammaln(n_c + 1)) + np.sum(gammaln(m_v + 1))
+    log_denominator = gammaln(N + 1) + np.sum(gammaln(f_cv + 1))
+    
     # If the denominator is infinity, return 1.0 (indicating a problem)
     if np.isinf(log_denominator):
         return 1.0
@@ -70,40 +78,52 @@ def g_stat(y, X_column, threshold):
         P0 = np.exp(log_numerator - log_denominator)  # Calculate the final probability
         gain = 1 - P0  # Compute the gain
         return gain
-
-
+    
 # Gene 4: Mantaras
+def safe_log2(x):
+    """ Computes log2, returning 0 for log2(0) """
+    return np.log2(x, out=np.zeros_like(x), where=(x > 0))
+
 def mantaras(y, X_column, threshold):
+    # Ensure y is 1D array of integers
+    y = np.array(y)
+    if y.ndim > 1:
+        y = y.ravel()
+    if not np.issubdtype(y.dtype, np.integer):
+        y = LabelEncoder().fit_transform(y)
+        
+    X_column = np.asarray(X_column).ravel()
+
     left_indices = X_column <= threshold
     right_indices = X_column > threshold
-    
+
     left_counts = np.bincount(y[left_indices], minlength=np.max(y)+1)
     right_counts = np.bincount(y[right_indices], minlength=np.max(y)+1)
-    observed = np.array([left_counts, right_counts])# contengency table, how many times each class appears in subgroups after split
+    observed = np.array([left_counts, right_counts])  # contingency table
 
     # Margin frequencies
     total_left = np.sum(observed[0])
     total_right = np.sum(observed[1])
     total = np.sum(observed)
 
-    # expected frequencies 
-    expected_left = np.outer(np.sum(observed, axis=1), np.sum(observed, axis=0)) / total
-    expected_right = expected_left 
-
-    # Mutual info for left group
-    P_left = observed[0] / total_left 
-    P_left = np.clip(P_left, 1e-10, 1)
-    P_left_marginal = np.sum(P_left)
-    MI_left = np.sum(P_left * np.log(P_left / (P_left_marginal)))  # handle division by zero
-
-    # Mutual info for right group
-    P_right = observed[1] / total_right 
-    P_right = np.clip(P_right, 1e-10, 1)
-    P_right_marginal = np.sum(P_right)
-    MI_right = np.sum(P_right * np.log(P_right / (P_right_marginal)))  # handle division by zero
-    distance = MI_left + MI_right
-
-    return distance
+    class_counts = np.bincount(y, minlength=np.max(y)+1)
+    class_probabilities = class_counts / total
+    
+    pv_counts = np.array([total_left, total_right])
+    pv_probabilities = pv_counts / total
+    
+    I_PC = -np.sum(class_probabilities * safe_log2(class_probabilities))
+    I_PV = -np.sum(pv_probabilities * safe_log2(pv_probabilities))
+    joint_probabilities = observed / total
+    I_PC_PV = -np.sum(joint_probabilities * safe_log2(joint_probabilities))
+    I_PC__PV = I_PC_PV - I_PV
+    I_PV__PC = I_PC_PV - I_PC
+    
+    distance = I_PC__PV + I_PV__PC
+    distance = distance / I_PC_PV # normalization
+    gain = 1 - distance # to minimize
+    
+    return gain
 
 # Gene 5: Hypergeometric Distribution
 
@@ -135,8 +155,7 @@ def hg_distribution(y, X_column, threshold):
         return gain
 
     
-# Gene 6: C
-
+# Gene 6: Chv
 def chv_criterion(y, X_column, threshold):
     if isinstance(X_column, pd.Series):
         X_column = X_column.values
@@ -153,43 +172,50 @@ def chv_criterion(y, X_column, threshold):
     if len(left) == 0 or len(right) == 0:
         return float('inf')
 
+    left_indices = X_column <= threshold
+    right_indices = X_column > threshold
+    
+    left = y[left_indices]
+    right = y[right_indices]
     C = len(np.unique(y)) # number of classes 
-    n_y = len(y)
+    R = len(y)
     class_counts = pd.Series(y).value_counts().to_dict()
-
-    C_left = len(np.unique(left)) # number of classes in left group
-    n_left = len(left) # number of instances in left group
+    
+    CS1 = len(np.unique(left)) # number of classes in left group
+    S1 = len(left) # number of instances in left group
     class_counts_left = pd.Series(left).value_counts().to_dict()
-
+    
     # Statistiques pour la partition S2
-    C_right = len(np.unique(right))
-    n_right = len(right)
+    CS2 = len(np.unique(right))
+    S2 = len(right)
     class_counts_right = pd.Series(right).value_counts().to_dict()
-
+    
     # Calculate first term of gain
     term1 = 0
-    if C_left > 0 and C > 0 and n_y > 0: # check for potential division by zero
+    if CS1 > 0 and C > 0 and R > 0: # check for potential division by zero
         sum_ratio_left = 0
         for c in class_counts_left:
             n_i_left = class_counts_left.get(c, 0)
             n_i_y = class_counts.get(c, 0)
             if n_i_y > 0:
                 sum_ratio_left += n_i_left / n_i_y
-        term1 = (n_left / n_y) * (C_left / C) * sum_ratio_left
+        term1 = (S1 / R) * (CS1 / C) * sum_ratio_left
 
+    
     # Calculate second term of gain 
     term2 = 0
-    if C_right > 0 and C > 0 and n_y > 0:
+    if CS2 > 0 and C > 0 and R > 0:
         sum_ratio_right = 0
         for class_label in class_counts_right:
             n_i_S2 = class_counts_right.get(class_label, 0)
             n_i_R = class_counts.get(class_label, 0)
             if n_i_R > 0:
                 sum_ratio_right += n_i_S2 / n_i_R
-        term2 = (n_right / n_y) * (C_right / C) * sum_ratio_right
-
+        term2 = (S2 / R) * (CS2 / C) * sum_ratio_right
+    
     # Calculate gain
     measure = term1 + term2
+    measure = measure / C # to normalize
     gain = 1 - measure
     return gain
 
@@ -246,23 +272,33 @@ def dcsm(y, X_column, threshold):
 
     # calculate gain
     dcsm = left_term + right_term
-    gain = 1 - dcsm
+    gain =  1000 - dcsm
     return gain
 
 # Gene 8: Chi Square
 def chi_square(y, X_column, threshold):
+    # Ensure y is 1D array of integers
+    y = np.array(y)
+    if y.ndim > 1:
+        y = y.ravel()
+    if not np.issubdtype(y.dtype, np.integer):
+        y = LabelEncoder().fit_transform(y)
+    
+    X_column = np.asarray(X_column).ravel()
+
     left_indices = X_column <= threshold
     right_indices = X_column > threshold
-    
-    # counts classes occurences 
+
+    # counts classes occurrences 
     left_counts = np.bincount(y[left_indices], minlength=np.max(y) + 1)
     right_counts = np.bincount(y[right_indices], minlength=np.max(y) + 1)
-    observed = np.array([left_counts, right_counts]) # contengency table, how many times each class appears in subgroups after split
+    observed = np.array([left_counts, right_counts])  # contingency table, how many times each class appears in subgroups after split
     observed = np.maximum(observed, 1e-6)  # Replace 0 by small values to manage calculation problems 
 
     # calculate expected frequencies 
     expected = np.outer(np.sum(observed, axis=1), np.sum(observed, axis=0)) / np.sum(observed)
-    chi2_stat, p_value, dof, expected = chi2_contingency(observed, correction=False) # calculates chi-quare on contingency table
+    chi2_stat, p_value, dof, expected = chi2_contingency(observed, correction=False)  # calculates chi-square on contingency table
+
     return chi2_stat
 
 # Gene 9: Mean Posterior Improvement 
@@ -482,13 +518,17 @@ class SplitCriterion:
             
     # Gene 0: Information Gain
     def _information_gain(self, y, X_column, threshold):
-        left_indices = X_column <= threshold
-        right_indices = X_column > threshold
-        # check if one group is empty
-        if len(y[left_indices]) == 0 or len(y[right_indices]) == 0:
-            return 0
-        return information_gain(y, left_indices, right_indices)
+        left_mask = X_column <= threshold
+        right_mask = X_column > threshold
     
+        if left_mask.sum() == 0 or right_mask.sum() == 0:
+            return 0
+    
+        left_indices = np.where(left_mask)[0]
+        right_indices = np.where(right_mask)[0]
+    
+        return information_gain(y, left_indices, right_indices)
+
     # Gene 1: Gini
     def _gini_gain(self, y, X_column, threshold):
         left_indices = X_column <= threshold

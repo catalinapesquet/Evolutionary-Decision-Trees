@@ -40,7 +40,7 @@ print(evaluate_tree(tree_sk, X_train, y_train, X_test, y_test))
 print("\n Custom DT like Sklearn")
 print_tree(tree_sk.tree_)
 
-tree = decode([10, 3, 0, 3, 4, 0, 5, 13])
+tree = decode([9, 2, 31, 2, 2, 1, 5, 27])
 print("\n Custom DT Result metrics")
 print(evaluate_tree(tree, X_train, y_train, X_test, y_test))
 print("\n Custom DT Result")

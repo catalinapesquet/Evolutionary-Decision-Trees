@@ -1,24 +1,35 @@
+# -*- coding: utf-8 -*-
 """
-Created on Fri Apr 25 17:58:08 2025
+Created on Tue Apr 29 11:28:46 2025
 
-@author: Catalina
+@author: Aurora
 """
+
+from Extract_data import extract_data
 from pymoo.core.problem import ElementwiseProblem
-from encode_decode import decode
-from encode_decode import decode
-from metrics import evaluate_tree 
-import numpy as np
-
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from choice_sampling import ChoiceRandomSampling
-from pymoo.operators.crossover.ux import UniformCrossover
 from pymoo.operators.crossover.pntx import SinglePointCrossover
 from pymoo.operators.mutation.rm import ChoiceRandomMutation
-from pymoo.termination import get_termination
 from pymoo.optimize import minimize
 from pymoo.core.variable import Choice
+from pymoo.termination import get_termination
 
+from encode_decode import decode
+from metrics import evaluate_tree 
+ 
+# PARAMETERS
+dataset="anneal"
+pop_size = 100
+n_gen = 100
 
+# LOAD DATA 
+# Split into train/test sets
+X_train, X_test, y_train, y_test =extract_data(dataset)
+
+# DEFINE PROBLEM
+
+import numpy as np
 class TreeProblem(ElementwiseProblem):
     def __init__(self, X_train, y_train, X_test, y_test, objectives):
         self.X_train = X_train
@@ -65,13 +76,11 @@ class TreeProblem(ElementwiseProblem):
             # In case of fail in the construction of the tree
             out["F"] = [1.0, 999]
 
-from sklearn.model_selection import train_test_split
-from sklearn.datasets import load_iris
-
-iris = load_iris()
-X, y = iris.data, iris.target
-X_meta_train, X_meta_test, y_meta_train, y_meta_test = train_test_split(X, y, train_size=0.9)
-X_train, X_test, y_train, y_test = train_test_split(X_meta_train, y_meta_train, train_size=0.7)
+algorithm = NSGA2(pop_size=pop_size,
+                  sampling=ChoiceRandomSampling(),
+                  crossover=SinglePointCrossover(prob=0.9),
+                  mutation=ChoiceRandomMutation(prob=0.3),
+                  eliminate_duplicates=True)
 problem = TreeProblem(
     X_train=X_train,
     y_train=y_train,
@@ -80,13 +89,8 @@ problem = TreeProblem(
     objectives=["f1", "n_nodes"]  
 )
 
-pop_size, n_gen = 100, 100
-algorithm = NSGA2(pop_size=pop_size,
-                  sampling=ChoiceRandomSampling(),
-                  crossover=SinglePointCrossover(prob=0.9),
-                  mutation=ChoiceRandomMutation(prob=0.3),
-                  eliminate_duplicates=True)
 termination = get_termination("n_gen", n_gen)
+
 res = minimize(problem,
                algorithm,
                termination,
@@ -96,9 +100,10 @@ res = minimize(problem,
 
 # PLOTS
 import matplotlib.pyplot as plt
+import numpy as np
 from pymoo.indicators.hv import HV
 
-# Extract Pareto fronts from each generation
+# 1. Extract Pareto fronts from each generation
 fronts_per_gen = []
 X_per_gen = []
 for algo in res.history:
@@ -108,7 +113,7 @@ for algo in res.history:
 
 print(f"Number of extracted Pareto fronts: {len(fronts_per_gen)}")
 
-# Plot Pareto fronts every 10 generations (2D plot)
+# 2. Plot Pareto fronts every 10 generations (2D plot)
 step = 10  # Plot every 10 generations
 gens_to_plot = list(range(0, len(fronts_per_gen), step))
 
@@ -136,7 +141,7 @@ plt.tight_layout(rect=[0, 0, 1, 0.95])
 plt.show()
 
 
-# Plot only the 4 first generations
+# 3. Plot only the 4 first generations
 gens_to_plot = list(range(0, min(4, len(fronts_per_gen))))
 
 fig, axes = plt.subplots(1, len(gens_to_plot), figsize=(5 * len(gens_to_plot), 4))
@@ -155,7 +160,7 @@ plt.tight_layout(rect=[0, 0, 1, 0.95])
 plt.show()
 
 
-# Plot Hypervolume evolution
+# Compute and plot Hypervolume evolution
 # Find the reference point
 all_points = np.vstack(fronts_per_gen)
 ref_point = np.max(all_points, axis=0) + 0.05  # Safety margin
@@ -176,7 +181,7 @@ plt.grid(True)
 plt.show()
 
 
-# 5. Plot the first 10 generations if available
+# Plot the first 10 generations if available
 gens_to_plot = list(range(min(10, len(fronts_per_gen))))
 
 n_cols = 5
@@ -205,16 +210,13 @@ plt.show()
 mean_nodes = np.mean(res.F[:,1])
 mean_f1 = np.mean(res.F[:,0])
 
-print(f"mean nodes : \n {mean_nodes}")
-print(f"mean f1 : \n {mean_f1}")
-print(f"Solutions: \n {res.X}")
-print(f"Results : \n {res.F}")
-
+print(f"mean nodes : {mean_nodes}")
+print(f"mean f1 : {mean_f1}")
 
 import datetime
 
 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-filename = f"log/results_2obj_iris_{timestamp}.txt"
+filename = f"log/results_2obj_{dataset}_{timestamp}.txt"
 
 with open(filename, "w") as f:
     f.write(f"Solutions:\n{res.X}\n")
@@ -242,7 +244,7 @@ gene_titles = [
 
 # Création du fichier avec timestamp
 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-filename = f"log/gene_statistics_{timestamp}.txt"
+filename = f"log/gene_statistics_{dataset}_{timestamp}.txt"
 
 with open(filename, "w") as f:
     for i, title in enumerate(gene_titles):
@@ -252,8 +254,3 @@ with open(filename, "w") as f:
         for key, count in sorted(counter.items()):
             f.write(f"{key}: {count} times\n")
         f.write("\n")
-
-
-
-
-

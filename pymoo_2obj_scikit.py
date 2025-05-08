@@ -5,7 +5,7 @@ Created on Mon Apr 28 15:58:07 2025
 @author: Aurora
 """
 from pymoo.core.problem import ElementwiseProblem
-from decode_small import decode
+from decode_small import decode_small
 from metrics import evaluate_tree 
 import numpy as np
 
@@ -43,7 +43,7 @@ class TreeProblem(ElementwiseProblem):
         try:
             # Decode tree from genotype
             # print("Evaluating x :", x.tolist())
-            tree = decode(x.tolist())
+            tree = decode_small(x.tolist())
  
             metrics = evaluate_tree(tree, self.X_train, self.y_train, self.X_test, self.y_test)
             # print(f'metrics = {metrics}')
