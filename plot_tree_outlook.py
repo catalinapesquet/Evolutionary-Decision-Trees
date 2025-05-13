@@ -18,7 +18,7 @@ from sklearn.preprocessing import LabelEncoder
 
 
 # Reload dataset with proper delimiter
-df = pd.read_csv("C:\\Users\\Aurora\\Desktop\\DecisionTreesEA\\DT\\Play(Sheet1).csv", sep=";")
+df = pd.read_csv("C:\\Users\\Aurora\\Desktop\\DecisionTreesEA\\dataset\\datasets\\Play(Sheet1).csv", sep=";")
 
 le = LabelEncoder()
 df["Weather"] = le.fit_transform(df["Weather"])
@@ -46,7 +46,7 @@ print(evaluate_tree(tree_sk, X_train, y_train, X_test, y_test))
 print_tree(tree_sk.tree_)
 
 print("\n Custom DT Result")
-tree = decode([6, 3, 0, 3, 0, 0, 0, 0])
+tree = decode([11, 1, 10, 2, 0, 0, 5, 0])
 print(evaluate_tree(tree, X_train, y_train, X_test, y_test))
 print_tree(tree.tree_)
 

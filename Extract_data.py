@@ -4,13 +4,19 @@ Created on Thu May  8 11:26:10 2025
 
 @author: Aurora
 """
-import pandas as pd
+
+import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
+import pandas as pd
 
 le = LabelEncoder()
 
 def extract_data(dataset):
+    
+    X = None
+    y = None
+
     if dataset == "outlook":
         path = "C:\\Users\\Aurora\\Desktop\\DecisionTreesEA\\dataset\\datasets\\Play(Sheet1).csv"
         df = pd.read_csv(path, sep=";")
@@ -106,11 +112,44 @@ def extract_data(dataset):
         # Split into features and target
         X = df.drop(columns=["Classes"]).to_numpy()
         y = df["Classes"].to_numpy().astype(int)
-                
+        counts = pd.Series(y).value_counts()
+        valid_classes = counts[counts >= 2].index
+        mask = np.isin(y, valid_classes)
+        
+        X = X[mask]
+        y = y[mask]
+         
     elif dataset == "audiology":
         path = "C:\\Users\\Aurora\\Desktop\\DecisionTreesEA\\dataset\\datasets\\audiology.data"
-        df = pd.read_csv(path, sep=";")
+        raw_df = pd.read_csv(path, sep=";", header=None)
         
+        # Nettoyage sur raw_df, pas sur df
+        raw_df.dropna(axis=1, how='all', inplace=True)  # retire colonnes totalement vides
+        raw_df.dropna(axis=0, how='all', inplace=True)  # retire lignes totalement vides
+        
+        # Ensuite
+        # Suppose that the last column is the target
+        target_col = raw_df.columns[-1]
+        
+        # Encode toutes les colonnes
+        le = LabelEncoder()
+        for col in raw_df.columns:
+            raw_df[col] = le.fit_transform(raw_df[col].astype(str))
+        
+        # Séparer features et target
+        X = raw_df.drop(columns=[target_col]).to_numpy()
+        y = raw_df[target_col].to_numpy().astype(int)
+        
+        # Nettoyage supplémentaire : enlever classes rares
+        counts = pd.Series(y).value_counts()
+        valid_classes = counts[counts >= 2].index
+        mask = np.isin(y, valid_classes)
+        
+        X = X[mask]
+        y = y[mask]
+        
+        print(f"✅ Dataset 'audiology' chargé : {X.shape[0]} exemples après nettoyage.")
+
     elif dataset == "car":
         path = "C:\\Users\\Aurora\\Desktop\\DecisionTreesEA\\dataset\\datasets\\car.data"
         df = pd.read_csv(path, sep=";")
@@ -126,13 +165,5 @@ def extract_data(dataset):
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     return X_train, X_test, y_train, y_test
 
-path = "C:\\Users\\Aurora\\Desktop\\DecisionTreesEA\\dataset\\datasets\\arrhythmia.data"
-df = pd.read_csv(path, sep=",", header=None)
-columns = [
-    "Age", "Sex", "Height", "Weight", "QRS duration", "P-R interval", "Q-T interval",
-    "T interval", "P interval",
-    "QRS angle", "T angle", "P angle", "QRST angle", "J angle",
-    "Heart rate", 
-]
 
-
+# extract_data("arrhythmia")

@@ -46,7 +46,7 @@ def _gini_gain(y, X_column, threshold):
     p = float(len(y[left_indices])) / len(y)
     return gini(y) - p * gini(y[left_indices]) - (1 - p) * gini(y[right_indices])
 
-# Gene 3: G Statistic 
+# Gene 2: G Statistic 
 def g_stat(y, X_column, threshold):
 
     y = np.asarray(y).ravel().astype(int)
@@ -81,7 +81,7 @@ def g_stat(y, X_column, threshold):
         return gain
     
     
-# Gene 4: Mantaras
+# Gene 3: Mantaras
 def safe_log2(x):
     """ Computes log2, returning 0 for log2(0) """
     return np.log2(x, out=np.zeros_like(x), where=(x > 0))
@@ -127,7 +127,7 @@ def mantaras(y, X_column, threshold):
     
     return gain
 
-# Gene 5: Hypergeometric Distribution
+# Gene 4: Hypergeometric Distribution
 
 def hg_distribution(y, X_column, threshold):
     C = len(np.unique(y))  # Number of classes
@@ -158,7 +158,7 @@ def hg_distribution(y, X_column, threshold):
         return gain
 
     
-# Gene 6: Chv
+# Gene 5: Chv
 def chv_criterion(y, X_column, threshold):
     if isinstance(X_column, pd.Series):
         X_column = X_column.values
@@ -222,7 +222,7 @@ def chv_criterion(y, X_column, threshold):
     gain = 1 - measure
     return gain
 
-# Gene 7: DCSM
+# Gene 6: DCSM
 def dcsm(y, X_column, threshold):
     y = np.array(y)
     X_column = np.array(X_column)
@@ -278,7 +278,7 @@ def dcsm(y, X_column, threshold):
     gain =  1000 - dcsm
     return gain
 
-# Gene 8: Chi Square
+# Gene 7: Chi Square
 def chi_square(y, X_column, threshold):
     # Ensure y is 1D array of integers
     y = np.array(y)
@@ -304,7 +304,7 @@ def chi_square(y, X_column, threshold):
 
     return chi2_stat
 
-# Gene 9: Mean Posterior Improvement 
+# Gene 8: Mean Posterior Improvement 
 def mpi(y, X_column, threshold):
     L_indices = X_column <= threshold
     R_indices = X_column > threshold
@@ -341,7 +341,7 @@ def mpi(y, X_column, threshold):
     mpi_value = pL * pR - mpi_sum
     return mpi_value
     
-# Gene 11: ORT 
+# Gene 9: ORT 
 def ORT(y, X_column, threshold):
     L_indices = X_column <= threshold
     R_indices = X_column > threshold
@@ -369,11 +369,11 @@ def ORT(y, X_column, threshold):
         cosine = dot_product / (magnitude_L * magnitude_R) 
     
     # Calculate ORT
-    ort_value = 1 - np.abs(cosine)
+    ort_value = np.abs(1-cosine)
     
     return ort_value
 
-# Gene 12: Twoing
+# Gene 10: Twoing
 def twoing(y, X_column, threshold):
     left_indices = X_column <= threshold
     right_indices = X_column > threshold
@@ -407,7 +407,7 @@ def twoing(y, X_column, threshold):
 
     return twoing_value
 
-# Gene 13: CAIR
+# Gene 11: CAIR
 def cai_after_split(y, X_column, threshold):
     left_indices = X_column <= threshold
     right_indices = X_column > threshold
@@ -449,14 +449,92 @@ def redundancy_measure(y, X_column, threshold):
 
     return inconsistency
 
-def cair(y, X_column, threshold):
-    gain = cai_after_split(y, X_column, threshold)
-    redundancy = redundancy_measure(y, X_column, threshold)
-    epsilon = 1e-9
-    gain = gain / (redundancy + epsilon)
-    return (1-gain)
+# def cair(y, X_column, threshold):
+#     if len(y) != len(X_column):
+#         raise ValueError("y and X_column must have the same length")
 
-# Gene 14: Gain Ratio
+#     left_indices = X_column <= threshold
+#     right_indices = X_column > threshold
+
+#     n_total = len(y)
+#     n_left = np.sum(left_indices)
+#     n_right = np.sum(right_indices)
+
+#     if n_left == 0 or n_right == 0:
+#         print("Warning: One split is empty. Returning a large value.") 
+#         return np.inf 
+
+#     gain = information_gain(y, left_indices, right_indices)
+
+#     num_classes = np.max(y) + 1
+#     left_counts = np.bincount(y[left_indices], minlength=num_classes)
+#     right_counts = np.bincount(y[right_indices], minlength=num_classes)
+#     observed = np.vstack([left_counts, right_counts])  
+
+#     total = observed.sum()
+#     expected = np.outer(observed.sum(axis=0), observed.sum(axis=1)) / total
+#     expected = expected.T  # Ajuster pour être aligné avec observed
+
+#     chi2_statistic = np.sum((observed - expected) ** 2 / (expected + 1e-9))
+
+#     conditional_term = chi2_statistic / (2 * n_total)
+
+#     r_ca = gain - conditional_term
+
+#     return r_ca
+def calculate_exact_mutual_information(A_prime, A):
+    """
+    Calcule exactement l'information mutuelle I(A';A)
+    entre l'attribut discrétisé A' et l'attribut continu A.
+    """
+    # Discrétiser A (continu) pour pouvoir faire une table de contingence
+    # Ici : discretiser A en 10 intervalles égaux par exemple
+    bins = np.linspace(np.min(A), np.max(A), 11)  # 10 bins
+    A_binned = np.digitize(A, bins)
+
+    # Créer la table de contingence entre A_prime (0/1) et A_binned
+    contingency_table = np.zeros((2, np.max(A_binned) + 1))
+
+    for a_prime_val in [0, 1]:
+        indices = (A_prime == a_prime_val)
+        counts = np.bincount(A_binned[indices], minlength=contingency_table.shape[1])
+        contingency_table[a_prime_val, :] = counts
+
+    total = contingency_table.sum()
+
+    # Calcul des probabilités
+    joint_probs = contingency_table / total
+    marginal_A_prime = joint_probs.sum(axis=1)
+    marginal_A_binned = joint_probs.sum(axis=0)
+
+    mutual_info = 0.0
+    for i in range(2):
+        for j in range(contingency_table.shape[1]):
+            if joint_probs[i, j] > 0:
+                mutual_info += joint_probs[i, j] * np.log2(joint_probs[i, j] / (marginal_A_prime[i] * marginal_A_binned[j] + 1e-9))
+
+    return mutual_info
+
+def cair(y, X_column, threshold):
+
+    A_prime = (X_column > threshold).astype(int)
+
+    left_indices = X_column <= threshold
+    right_indices = X_column > threshold
+
+    I_C_Aprime = information_gain(y, left_indices, right_indices)
+
+    _, counts = np.unique(A_prime, return_counts=True)
+    probabilities = counts / counts.sum()
+    I_Aprime_A = calculate_exact_mutual_information(A_prime, X_column)
+
+
+    cair_value = I_Aprime_A - I_C_Aprime
+
+    return cair_value
+
+
+# Gene 12: Gain Ratio
 def gain_ratio(y, X_column, threshold):
     initial_entropy = entropy(y)
 

@@ -5,31 +5,13 @@ Created on Tue Mar 25 11:22:30 2025
 @author: Catalina
 """
 
-from Split_Criteria import (gini,
-                            information_gain,
-                            g_stat,
-                            mantaras, 
-                            hg_distribution,
-                            chv_criterion,
-                            dcsm,
-                            chi_square,
-                            mpi,
-                            ORT,
-                            twoing,
-                            cair,
-                            gain_ratio,
-                            SplitCriterion)
+from Split_Criteria import SplitCriterion
 from Stopping_Criteria import StoppingCriterion
 from Missing_Values import MissingValues
 from Pruning_Strategies import Pruning
 
 import numpy as np
 import pandas as pd
-from collections import defaultdict
-from sklearn.datasets import load_iris
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
-from scipy.special import gammaln
 
 class DecisionTree:
     """
@@ -98,6 +80,8 @@ class DecisionTree:
         n_labels = len(np.unique(y))
     
         majority_class = self._most_common_label(y)
+        if n_labels == 1 or len(y) <= 1:
+            return Node(value=majority_class, is_leaf=True)
     
         # Stopping condition
         if self.stopping_criteria.stop(n_tot_samples, y, depth):
@@ -155,7 +139,6 @@ class DecisionTree:
     def _best_split(self, X, y, n_samples, n_features):
         best_gain = -1
         split_idx, split_threshold = None, None
-        left_idxs, right_idxs = None, None  
     
         # Prepares data frame
         X_df = pd.DataFrame(X, columns=list(range(X.shape[1])))
@@ -172,6 +155,7 @@ class DecisionTree:
                         continue
     
                     gain = self.mv_handler.weight_split(X_df, y, feat_idx, threshold)
+                    # print(f"Tested split - Feature {feat_idx} | Threshold: {threshold:.2f} | Gain: {gain:.4f}")
                     
                     if gain <= 0:
                         continue
@@ -221,6 +205,8 @@ class DecisionTree:
                     gain = self._calculate_criterion(y_filtered, X_column_filtered, threshold)
                     
                     # DEBUGGING
+                    if feat_idx == 0 :
+                        print(f"Tested split - Feature {feat_idx} | Threshold: {threshold:.2f} | Gain: {gain:.4f}")
                     # print(f"Tested split - Feature {feat_idx} | Threshold: {threshold:.2f} | Gain: {gain:.4f}")
                     
                     if gain <= 0:

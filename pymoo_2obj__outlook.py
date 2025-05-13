@@ -17,9 +17,12 @@ from pymoo.termination import get_termination
 
 from encode_decode import decode
 from metrics import evaluate_tree 
+
+import datetime
+timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
  
 # PARAMETERS
-dataset="anneal"
+dataset="arrhythmia"
 pop_size = 100
 n_gen = 100
 
@@ -157,6 +160,8 @@ for idx, gen_idx in enumerate(gens_to_plot):
 
 fig.suptitle("First 4 Generations (2D Pareto Front)", fontsize=20)
 plt.tight_layout(rect=[0, 0, 1, 0.95])
+filename = f"4gen_2obj_{dataset}_{timestamp}.png"
+plt.savefig(f"C:/Users/Aurora/Desktop/DecisionTreesEA/DT/log/{filename}", dpi=300, bbox_inches='tight')
 plt.show()
 
 
@@ -178,6 +183,8 @@ plt.xlabel('Generation')
 plt.ylabel('Hypervolume')
 plt.title('Hypervolume Evolution Across Generations')
 plt.grid(True)
+filename = f"HV_2obj_{dataset}_{timestamp}.png"
+plt.savefig(f"C:/Users/Aurora/Desktop/DecisionTreesEA/DT/log/{filename}", dpi=300, bbox_inches='tight')
 plt.show()
 
 
@@ -202,9 +209,12 @@ for idx, gen_idx in enumerate(gens_to_plot):
 # Remove empty plots
 for j in range(len(gens_to_plot), len(axes)):
     fig.delaxes(axes[j])
+    
 
 fig.suptitle("First 10 Generations (2D Pareto Front)", fontsize=20)
 plt.tight_layout(rect=[0, 0, 1, 0.95])
+filename = f"plot_2obj_{dataset}_{timestamp}.png"
+plt.savefig(f"C:/Users/Aurora/Desktop/DecisionTreesEA/DT/log/{filename}", dpi=300, bbox_inches='tight')
 plt.show()
 
 mean_nodes = np.mean(res.F[:,1])
@@ -213,9 +223,7 @@ mean_f1 = np.mean(res.F[:,0])
 print(f"mean nodes : {mean_nodes}")
 print(f"mean f1 : {mean_f1}")
 
-import datetime
 
-timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 filename = f"log/results_2obj_{dataset}_{timestamp}.txt"
 
 with open(filename, "w") as f:
