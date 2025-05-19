@@ -7,7 +7,7 @@ Created on Thu May  8 11:26:10 2025
 
 import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, OrdinalEncoder
 import pandas as pd
 
 le = LabelEncoder()
@@ -120,50 +120,149 @@ def extract_data(dataset):
         y = y[mask]
          
     elif dataset == "audiology":
-        path = "C:\\Users\\Aurora\\Desktop\\DecisionTreesEA\\dataset\\datasets\\audiology.data"
-        raw_df = pd.read_csv(path, sep=";", header=None)
+        # Load the dataset
+        path = "C:\\Users\\Aurora\\Desktop\\DecisionTreesEA\\dataset\\datasets\\audiology_standardized.data"
+        df = pd.read_csv(path, sep=",")
         
-        # Nettoyage sur raw_df, pas sur df
-        raw_df.dropna(axis=1, how='all', inplace=True)  # retire colonnes totalement vides
-        raw_df.dropna(axis=0, how='all', inplace=True)  # retire lignes totalement vides
+        # Define column names
+        df.columns = [
+            "age_gt_60", "air", "airBoneGap", "ar_c", "ar_u", "bone", "boneAbnormal", "bser",
+            "history_buzzing", "history_dizziness", "history_fluctuating", "history_fullness",
+            "history_heredity", "history_nausea", "history_noise", "history_recruitment",
+            "history_ringing", "history_roaring", "history_vomiting", "late_wave_poor",
+            "m_at_2k", "m_cond_lt_1k", "m_gt_1k", "m_m_gt_2k", "m_m_sn", "m_m_sn_gt_1k",
+            "m_m_sn_gt_2k", "m_m_sn_gt_500", "m_p_sn_gt_2k", "m_s_gt_500", "m_s_sn",
+            "m_s_sn_gt_1k", "m_s_sn_gt_2k", "m_s_sn_gt_3k", "m_s_sn_gt_4k", "m_sn_2_3k",
+            "m_sn_gt_1k", "m_sn_gt_2k", "m_sn_gt_3k", "m_sn_gt_4k", "m_sn_gt_500",
+            "m_sn_gt_6k", "m_sn_lt_1k", "m_sn_lt_2k", "m_sn_lt_3k", "middle_wave_poor",
+            "mod_gt_4k", "mod_mixed", "mod_s_mixed", "mod_s_sn_gt_500", "mod_sn", "mod_sn_gt_1k",
+            "mod_sn_gt_2k", "mod_sn_gt_3k", "mod_sn_gt_4k", "mod_sn_gt_500", "notch_4k",
+            "notch_at_4k", "o_ar_c", "o_ar_u", "s_sn_gt_1k", "s_sn_gt_2k", "s_sn_gt_4k",
+            "speech", "static_normal", "tymp", "viith_nerve_signs", "wave_V_delayed",
+            "waveform_ItoV_prolonged", "identifier", "classes"
+        ]
         
-        # Ensuite
-        # Suppose that the last column is the target
-        target_col = raw_df.columns[-1]
+        df = df.drop(columns=["identifier"])
         
-        # Encode toutes les colonnes
-        le = LabelEncoder()
-        for col in raw_df.columns:
-            raw_df[col] = le.fit_transform(raw_df[col].astype(str))
+        # Replace "?" with np.nan to handle missing values
+        df.replace("?", np.nan, inplace=True)
         
-        # Séparer features et target
-        X = raw_df.drop(columns=[target_col]).to_numpy()
-        y = raw_df[target_col].to_numpy().astype(int)
+        categorical_cols = df.columns.tolist()
+        # Define the order for columns with specific categories
+        ordered_categories = {
+            "air": ["mild", "moderate", "severe", "normal", "profound"],
+            "ar_c": ["normal", "elevated", "absent"],
+            "ar_u": ["normal", "elevated", "absent"],
+            "bone": ["mild", "moderate", "normal", "unmeasured"],
+            "bser": ["normal", "degraded"],
+            "o_ar_c": ["normal", "elevated", "absent"],
+            "o_ar_u": ["normal", "elevated", "absent"],
+            "speech": ["normal", "good", "very_good", "poor", "very_poor", "unmeasured"],
+            "tymp": ["a", "as", "b", "ad", "c"],
+        }
+        special_order_cols = list(ordered_categories.keys())
         
-        # Nettoyage supplémentaire : enlever classes rares
-        counts = pd.Series(y).value_counts()
-        valid_classes = counts[counts >= 2].index
-        mask = np.isin(y, valid_classes)
+        # Encode columns with a specific category order
+        encoder_special = OrdinalEncoder(
+            categories=[ordered_categories[col] for col in special_order_cols],
+            handle_unknown="use_encoded_value",
+            unknown_value=np.nan,
+            encoded_missing_value=np.nan
+        )
+        df[special_order_cols] = encoder_special.fit_transform(df[special_order_cols])
         
-        X = X[mask]
-        y = y[mask]
+        # Encode boolean columns ('f' -> 0, 't' -> 1)
+        bool_cols = [col for col in categorical_cols if col not in special_order_cols and col not in ["identifier", "classes"]]
+        for col in bool_cols:
+            df[col] = df[col].map({'f': 0, 't': 1})
         
-        print(f"✅ Dataset 'audiology' chargé : {X.shape[0]} exemples après nettoyage.")
-
+        # Remove rare classes (classes with only 1 sample)
+        y_labels = df["classes"]
+        class_counts = y_labels.value_counts()
+        rare_classes = class_counts[class_counts < 2].index.tolist()
+        df = df[~df["classes"].isin(rare_classes)]
+        
+        X = df.drop(columns=["classes"]).to_numpy().astype(np.float64)
+        y = le.fit_transform(df["classes"])
+        
     elif dataset == "car":
         path = "C:\\Users\\Aurora\\Desktop\\DecisionTreesEA\\dataset\\datasets\\car.data"
-        df = pd.read_csv(path, sep=";")
+        df = pd.read_csv(path, sep=",")
+        
+        # Name columns
+        df.columns = ["Buying", "Maint", "Doors", "Persons", "Lug_Boot", 
+                      "Safety", "classes"] 
+        
+        # Encode categorial values
+        categorical_cols = df.columns.tolist()
+        
+        ordered_categories = {
+            "Buying": ["vhigh", "high", "med", "low"],
+            "Maint": ["vhigh", "high", "med", "low"],
+            "Doors": ["2", "3", "4", "5more"],
+            "Persons": ["2", "4", "more"],
+            "Lug_Boot": ["small", "med", "big"],
+            "Safety": ["high", "med", "low"],
+ 
+        }
+        special_order_cols = list(ordered_categories.keys())
+        
+        # Encode columns with a specific category order
+        encoder_special = OrdinalEncoder(
+            categories=[ordered_categories[col] for col in special_order_cols],
+            handle_unknown="use_encoded_value",
+            unknown_value=np.nan,
+            encoded_missing_value=np.nan
+        )
+        df[special_order_cols] = encoder_special.fit_transform(df[special_order_cols])
+        
+        
+        # Encode classes manually
+        class_order = ["unacc", "acc", "good", "vgood"]
+        class_mapping = {label: idx for idx, label in enumerate(class_order)}
+        df["classes"] = df["classes"].map(class_mapping)
+        
+        # Remove rare classes (if needed, but for 'car' dataset normally all classes have enough samples)
+        y_labels = df["classes"]
+        class_counts = y_labels.value_counts()
+        rare_classes = class_counts[class_counts < 2].index.tolist()
+        df = df[~df["classes"].isin(rare_classes)]
+        
+        # Prepare X and y
+        X = df.drop(columns=["classes"]).to_numpy().astype(np.float64)
+        y = df["classes"].to_numpy().astype(int)
         
     elif dataset == "glass":
         path = "C:\\Users\\Aurora\\Desktop\\DecisionTreesEA\\dataset\\datasets\\glass.data"
-        df = pd.read_csv(path, sep=";")
+        df = pd.read_csv(path, sep=",")
+        
+        # Name columns
+        df.columns = ["identifier", "RI", "Na", "Mg", "AI", "Si", "K", "Ca", "Ba", "Fe", "classes"] 
+        df = df.drop(columns=["identifier"])
+        
+        # Prepare X and y
+        X = df.drop(columns=["classes"]).to_numpy().astype(np.float64)
+        y = df["classes"].to_numpy().astype(int)
         
     elif dataset == "hepatitis":
         path = "C:\\Users\\Aurora\\Desktop\\DecisionTreesEA\\dataset\\datasets\\hepatitis.data"
         df = pd.read_csv(path, sep=";")
+        
+    # Stratified train-test split
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)
     
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    # After split, keep only classes that have at least 2 samples in y_test
+    y_test_counts = pd.Series(y_test).value_counts()
+    valid_classes = y_test_counts[y_test_counts >= 2].index
+    mask_test = np.isin(y_test, valid_classes)
+    
+    X_test = X_test[mask_test]
+    y_test = y_test[mask_test]
+    
+    # Filter training set to only keep classes present in the new test set
+    mask_train = np.isin(y_train, valid_classes)
+    
+    X_train = X_train[mask_train]
+    y_train = y_train[mask_train]
+        
     return X_train, X_test, y_train, y_test
-
-
-# extract_data("arrhythmia")

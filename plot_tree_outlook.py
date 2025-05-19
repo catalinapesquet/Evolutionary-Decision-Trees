@@ -33,12 +33,12 @@ y = df["Play_binary"].to_numpy().astype(int)
 # Split into train/test sets
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-sk_tree = DecisionTreeClassifier(
-    criterion='entropy',
-    max_depth=10)
-sk_tree.fit(X_train, y_train)
-print("\n Sklearn")
-print(export_text(sk_tree))
+# sk_tree = DecisionTreeClassifier(
+#     criterion='entropy',
+#     max_depth=10)
+# sk_tree.fit(X_train, y_train)
+# print("\n Sklearn")
+# print(export_text(sk_tree))
 
 print("\n Custom DT like Sklearn")
 tree_sk = decode_small([0, 1, 100, 0, 55])
@@ -46,7 +46,7 @@ print(evaluate_tree(tree_sk, X_train, y_train, X_test, y_test))
 print_tree(tree_sk.tree_)
 
 print("\n Custom DT Result")
-tree = decode([11, 1, 10, 2, 0, 0, 5, 0])
+tree = decode([7, 1, 0, 1, 0, 1, 4, 32])
 print(evaluate_tree(tree, X_train, y_train, X_test, y_test))
 print_tree(tree.tree_)
 

@@ -148,7 +148,8 @@ class DecisionTree:
     
             # Special case: weight split
             if self.mv_handler.mv_split == 'weight_split':
-                thresholds = np.unique(X_column)
+                thresholds = np.sort(np.unique(X_column))
+                thresholds = (thresholds[:-1] + thresholds[1:]) / 2
                 for threshold in thresholds:
                     left_indices_temp, right_indices_temp = self._split(X_column, threshold)
                     if len(left_indices_temp) == 0 or len(right_indices_temp) == 0:
@@ -156,6 +157,8 @@ class DecisionTree:
     
                     gain = self.mv_handler.weight_split(X_df, y, feat_idx, threshold)
                     # print(f"Tested split - Feature {feat_idx} | Threshold: {threshold:.2f} | Gain: {gain:.4f}")
+                    # if feat_idx == 4 or feat_idx == 11 :
+                        # print(f"Tested split - Feature {feat_idx} | Threshold: {threshold:.2f} | Gain: {gain:.4f}")
                     
                     if gain <= 0:
                         continue
@@ -183,8 +186,7 @@ class DecisionTree:
                 vals = np.sort(np.unique(X_column_filtered))
                 if len(vals) < 2:
                     continue 
-                # print("Valeurs uniques dans X_column_filtered:", np.sort(np.unique(X_column_filtered)))
-
+                
                 thresholds = (vals[:-1] + vals[1:]) / 2  # midpoints between values
     
                 for threshold in thresholds:
@@ -205,8 +207,8 @@ class DecisionTree:
                     gain = self._calculate_criterion(y_filtered, X_column_filtered, threshold)
                     
                     # DEBUGGING
-                    if feat_idx == 0 :
-                        print(f"Tested split - Feature {feat_idx} | Threshold: {threshold:.2f} | Gain: {gain:.4f}")
+                    # if feat_idx == 4 or feat_idx == 11 :
+                        # print(f"Tested split - Feature {feat_idx} | Threshold: {threshold:.2f} | Gain: {gain:.4f}")
                     # print(f"Tested split - Feature {feat_idx} | Threshold: {threshold:.2f} | Gain: {gain:.4f}")
                     
                     if gain <= 0:
@@ -224,6 +226,7 @@ class DecisionTree:
         if split_idx is not None:
             # DEBUGGING
             # print(f"✅ Selected split: Feature {split_idx} | Threshold: {split_threshold} | Gain: {best_gain:.4f}")
+            # print(f"Left size: {len(left_idxs)}, Right size: {len(right_idxs)}")
             return split_idx, split_threshold, left_idxs, right_idxs
         
         # DEBUGGING
@@ -252,7 +255,7 @@ class DecisionTree:
         for i, inputs in enumerate(X):
             pred = self._predict(inputs)
             if pred is None:
-                print(f"⚠️ Exemple {i} : prédiction = None → inputs = {inputs}")
+                print(f"⚠️ Exemple {i} : prediction = None → inputs = {inputs}")
             y_pred.append(pred)
         return y_pred
 

@@ -47,11 +47,42 @@ def _gini_gain(y, X_column, threshold):
     return gini(y) - p * gini(y[left_indices]) - (1 - p) * gini(y[right_indices])
 
 # Gene 2: G Statistic 
+# def g_stat(y, X_column, threshold):
+
+#     y = np.asarray(y).ravel().astype(int)
+    
+#     C = len(np.unique(y))  # Number of classes
+
+#     n_c = np.bincount(y)  # Count of each class in the total group
+#     N = len(X_column)  # Total number of elements
+
+#     left_indices = X_column <= threshold
+#     right_indices = X_column > threshold
+#     m_v = np.array([np.sum(left_indices), np.sum(right_indices)])  # Number of elements in each group
+#     f_cv = np.zeros((C, 2), dtype=int)  # Correct initialization of the f_cv matrix
+#     for c in range(C):
+#         f_cv[c, 0] = np.sum(y[left_indices] == c)  # Count of instances of class c in the left group
+#         f_cv[c, 1] = np.sum(y[right_indices] == c)  # Count of instances of class c in the right group
+
+#     # Using logarithms to avoid overflow in the numerator and denominator
+#     log_numerator = np.sum(gammaln(n_c + 1)) + np.sum(gammaln(m_v + 1))
+#     log_denominator = gammaln(N + 1) + np.sum(gammaln(f_cv + 1))
+    
+#     # If the denominator is infinity, return 1.0 (indicating a problem)
+#     if np.isinf(log_denominator):
+#         return 1.0
+#     else:
+#         log_ratio = np.clip(log_numerator - log_denominator, -700, 700)
+#         P0 = np.exp(log_ratio) # Calculate the final probability
+#         gain = 1 - P0  # Compute the gain
+#         return gain
+    
 def g_stat(y, X_column, threshold):
 
     y = np.asarray(y).ravel().astype(int)
-    
-    C = len(np.unique(y))  # Number of classes
+    classes = np.unique(y)
+    C = len(classes)  # Number of classes
+    V = 2 # split into two groups
     # print("👀 y dans g_stat:", y)
     # print("🧾 type:", type(y), "| shape:", np.shape(y), "| dtype:", np.array(y).dtype)
     # print("🔢 valeurs uniques:", np.unique(y))
@@ -62,10 +93,10 @@ def g_stat(y, X_column, threshold):
     left_indices = X_column <= threshold
     right_indices = X_column > threshold
     m_v = np.array([np.sum(left_indices), np.sum(right_indices)])  # Number of elements in each group
-    f_cv = np.zeros((C, 2), dtype=int)  # Correct initialization of the f_cv matrix
-    for c in range(C):
-        f_cv[c, 0] = np.sum(y[left_indices] == c)  # Count of instances of class c in the left group
-        f_cv[c, 1] = np.sum(y[right_indices] == c)  # Count of instances of class c in the right group
+    f_cv = np.zeros((C, V), dtype=int)
+    for i, c in enumerate(classes):
+        f_cv[i, 0] = np.sum(y[left_indices] == c)
+        f_cv[i, 1] = np.sum(y[right_indices] == c)
 
     # Using logarithms to avoid overflow in the numerator and denominator
     log_numerator = np.sum(gammaln(n_c + 1)) + np.sum(gammaln(m_v + 1))
@@ -128,35 +159,38 @@ def mantaras(y, X_column, threshold):
     return gain
 
 # Gene 4: Hypergeometric Distribution
-
 def hg_distribution(y, X_column, threshold):
-    C = len(np.unique(y))  # Number of classes
-    V = 2  # Number of branches
-    n_c = np.bincount(y)  # Number of apparition of each class in parent node
-    N = len(X_column)  
+    classes = np.unique(y)
+    C = len(classes)  # Number of classes
+    V = 2  # Binary split
+    N = len(y)
 
     left_indices = X_column <= threshold
     right_indices = X_column > threshold
+    if not left_indices.any() or not right_indices.any():
+        return 0.0
 
-    m_v = np.array([np.sum(left_indices), np.sum(right_indices)])  # size of each group
+    # f_cv: [classes, branches]
+    f_cv = np.zeros((C, V), dtype=int)
+    for i, c in enumerate(classes):
+        f_cv[i, 0] = np.sum(y[left_indices] == c)
+        f_cv[i, 1] = np.sum(y[right_indices] == c)
+    
+    # print("f_cv:", f_cv)
 
-    f_cv = np.zeros((C, V), dtype=int) 
-    for c in range(C):
-        f_cv[c, 0] = np.sum(y[left_indices] == c)  # Count classes in left group
-        f_cv[c, 1] = np.sum(y[right_indices] == c)  # Count classes in right group
+    n_c = f_cv.sum(axis=1) 
+    m_v = f_cv.sum(axis=0)  
 
-    # Handle overlapping with logaritmic
-    log_numerator = sum(gammaln(count + 1) for count in n_c) + sum(gammaln(count + 1) for count in m_v)
-    log_denominator = gammaln(N + 1) + sum(gammaln(f_cv[c, v] + 1) for v in range(V) for c in range(C))
+    log_numerator = np.sum(gammaln(n_c + 1)) + np.sum(gammaln(m_v + 1))
+    # print("log_numerator: ", log_numerator)
+    log_denominator = gammaln(N + 1) + np.sum(gammaln(f_cv + 1))
+    # print("log_denominator: ", log_denominator)
+    log_P0 = log_numerator - log_denominator
+    log_P0 = np.clip(log_P0, -700, 700)
+    # P0 = np.exp(log_P0) # original gain, but due to realy small values we prefer using lop_P0 directly
 
-    if log_denominator == float('inf'):
-        return 1.0  
-    else:
-        log_ratio = np.clip(log_numerator - log_denominator, -700, 700)
-        P0 = np.exp(log_ratio)
-        gain = 1 - P0
-        return gain
-
+    gain = -log_P0 # à maximiser
+    return gain
     
 # Gene 5: Chv
 def chv_criterion(y, X_column, threshold):
@@ -408,46 +442,46 @@ def twoing(y, X_column, threshold):
     return twoing_value
 
 # Gene 11: CAIR
-def cai_after_split(y, X_column, threshold):
-    left_indices = X_column <= threshold
-    right_indices = X_column > threshold
-    # Check if one side is empty 
-    if len(left_indices) == 0 or len(right_indices) == 0:
-        return 0  
+# def cai_after_split(y, X_column, threshold):
+#     left_indices = X_column <= threshold
+#     right_indices = X_column > threshold
+#     # Check if one side is empty 
+#     if len(left_indices) == 0 or len(right_indices) == 0:
+#         return 0  
 
-    cai_value = information_gain(y, left_indices, right_indices)
-    return cai_value
+#     cai_value = information_gain(y, left_indices, right_indices)
+#     return cai_value
 
-def redundancy_measure(y, X_column, threshold):
-    left_indices = X_column <= threshold
-    right_indices = X_column > threshold
+# def redundancy_measure(y, X_column, threshold):
+#     left_indices = X_column <= threshold
+#     right_indices = X_column > threshold
     
-    left = y[left_indices]
-    right = y[right_indices]
+#     left = y[left_indices]
+#     right = y[right_indices]
 
-    n_y = len(y)
-    n_left = len(left)
-    n_right = len(right)
+#     n_y = len(y)
+#     n_left = len(left)
+#     n_right = len(right)
 
-    if len(left) == 0 or len(right) == 0:
-        return 0  
+#     if len(left) == 0 or len(right) == 0:
+#         return 0  
 
-    class_counts_parent = pd.Series(y).value_counts(normalize=True).to_dict()
-    class_counts_left = pd.Series(left).value_counts(normalize=True).to_dict()
-    class_counts_right = pd.Series(right).value_counts(normalize=True).to_dict()
+#     class_counts_parent = pd.Series(y).value_counts(normalize=True).to_dict()
+#     class_counts_left = pd.Series(left).value_counts(normalize=True).to_dict()
+#     class_counts_right = pd.Series(right).value_counts(normalize=True).to_dict()
 
-    inconsistency = 0
-    all_classes = set(class_counts_parent.keys()) | set(class_counts_left.keys()) | set(class_counts_right.keys())
+#     inconsistency = 0
+#     all_classes = set(class_counts_parent.keys()) | set(class_counts_left.keys()) | set(class_counts_right.keys())
 
-    for cls in all_classes:
-        prob_parent = class_counts_parent.get(cls, 0)
-        prob_left = class_counts_left.get(cls, 0)
-        prob_right = class_counts_right.get(cls, 0)
+#     for cls in all_classes:
+#         prob_parent = class_counts_parent.get(cls, 0)
+#         prob_left = class_counts_left.get(cls, 0)
+#         prob_right = class_counts_right.get(cls, 0)
 
-        # Calculer la différence pondérée des probabilités par la taille des partitions
-        inconsistency += abs(prob_left - prob_parent) * (n_left / n_y) + abs(prob_right - prob_parent) * (n_right / n_y)
+#         # Calculer la différence pondérée des probabilités par la taille des partitions
+#         inconsistency += abs(prob_left - prob_parent) * (n_left / n_y) + abs(prob_right - prob_parent) * (n_right / n_y)
 
-    return inconsistency
+#     return inconsistency
 
 # def cair(y, X_column, threshold):
 #     if len(y) != len(X_column):
@@ -482,57 +516,42 @@ def redundancy_measure(y, X_column, threshold):
 #     r_ca = gain - conditional_term
 
 #     return r_ca
-def calculate_exact_mutual_information(A_prime, A):
-    """
-    Calcule exactement l'information mutuelle I(A';A)
-    entre l'attribut discrétisé A' et l'attribut continu A.
-    """
-    # Discrétiser A (continu) pour pouvoir faire une table de contingence
-    # Ici : discretiser A en 10 intervalles égaux par exemple
-    bins = np.linspace(np.min(A), np.max(A), 11)  # 10 bins
-    A_binned = np.digitize(A, bins)
-
-    # Créer la table de contingence entre A_prime (0/1) et A_binned
-    contingency_table = np.zeros((2, np.max(A_binned) + 1))
-
-    for a_prime_val in [0, 1]:
-        indices = (A_prime == a_prime_val)
-        counts = np.bincount(A_binned[indices], minlength=contingency_table.shape[1])
-        contingency_table[a_prime_val, :] = counts
-
-    total = contingency_table.sum()
-
-    # Calcul des probabilités
-    joint_probs = contingency_table / total
-    marginal_A_prime = joint_probs.sum(axis=1)
-    marginal_A_binned = joint_probs.sum(axis=0)
-
-    mutual_info = 0.0
-    for i in range(2):
-        for j in range(contingency_table.shape[1]):
-            if joint_probs[i, j] > 0:
-                mutual_info += joint_probs[i, j] * np.log2(joint_probs[i, j] / (marginal_A_prime[i] * marginal_A_binned[j] + 1e-9))
-
-    return mutual_info
 
 def cair(y, X_column, threshold):
+    # Convert inputs to numpy arrays for easier manipulation
+    y = np.array(y)
+    X_column = np.array(X_column)
 
-    A_prime = (X_column > threshold).astype(int)
+    # Discretize the attribute column based on the threshold
+    A_d = np.where(X_column <= threshold, 0, 1)
 
-    left_indices = X_column <= threshold
-    right_indices = X_column > threshold
+    # Calculate the probabilities and entropies
+    classes, class_counts = np.unique(y, return_counts=True)
+    P_c = class_counts / len(y)
 
-    I_C_Aprime = information_gain(y, left_indices, right_indices)
+    # Calculate H(C)
+    H_C = -np.sum(P_c * np.log2(P_c + 1e-10))  # Adding a small value to avoid log(0)
 
-    _, counts = np.unique(A_prime, return_counts=True)
-    probabilities = counts / counts.sum()
-    I_Aprime_A = calculate_exact_mutual_information(A_prime, X_column)
+    # Calculate joint probabilities P(c_i, a_{dj})
+    P_ca = np.zeros((len(classes), 2))
+    for i, c in enumerate(classes):
+        for j in range(2):
+            P_ca[i, j] = np.sum((y == c) & (A_d == j)) / len(y)
 
+    # Calculate P(a_{dj})
+    P_a = np.sum(P_ca, axis=0)
 
-    cair_value = I_Aprime_A - I_C_Aprime
+    # Calculate I(C; A_d)
+    I_CA = 0
+    for i in range(len(classes)):
+        for j in range(2):
+            if P_ca[i, j] > 0 and P_c[i] > 0 and P_a[j] > 0:
+                I_CA += P_ca[i, j] * np.log2(P_ca[i, j] / (P_c[i] * P_a[j]))
 
-    return cair_value
+    # Calculate CAIR
+    R_CA = 1 - I_CA / H_C
 
+    return 1-R_CA
 
 # Gene 12: Gain Ratio
 def gain_ratio(y, X_column, threshold):
