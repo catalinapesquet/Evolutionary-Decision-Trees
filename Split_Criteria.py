@@ -13,6 +13,7 @@ from math import *
 from scipy.special import gammaln
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
+import warnings
 
 # Gene 0: Information Gain 
 def entropy(y):
@@ -47,45 +48,12 @@ def _gini_gain(y, X_column, threshold):
     return gini(y) - p * gini(y[left_indices]) - (1 - p) * gini(y[right_indices])
 
 # Gene 2: G Statistic 
-# def g_stat(y, X_column, threshold):
-
-#     y = np.asarray(y).ravel().astype(int)
-    
-#     C = len(np.unique(y))  # Number of classes
-
-#     n_c = np.bincount(y)  # Count of each class in the total group
-#     N = len(X_column)  # Total number of elements
-
-#     left_indices = X_column <= threshold
-#     right_indices = X_column > threshold
-#     m_v = np.array([np.sum(left_indices), np.sum(right_indices)])  # Number of elements in each group
-#     f_cv = np.zeros((C, 2), dtype=int)  # Correct initialization of the f_cv matrix
-#     for c in range(C):
-#         f_cv[c, 0] = np.sum(y[left_indices] == c)  # Count of instances of class c in the left group
-#         f_cv[c, 1] = np.sum(y[right_indices] == c)  # Count of instances of class c in the right group
-
-#     # Using logarithms to avoid overflow in the numerator and denominator
-#     log_numerator = np.sum(gammaln(n_c + 1)) + np.sum(gammaln(m_v + 1))
-#     log_denominator = gammaln(N + 1) + np.sum(gammaln(f_cv + 1))
-    
-#     # If the denominator is infinity, return 1.0 (indicating a problem)
-#     if np.isinf(log_denominator):
-#         return 1.0
-#     else:
-#         log_ratio = np.clip(log_numerator - log_denominator, -700, 700)
-#         P0 = np.exp(log_ratio) # Calculate the final probability
-#         gain = 1 - P0  # Compute the gain
-#         return gain
-    
 def g_stat(y, X_column, threshold):
 
     y = np.asarray(y).ravel().astype(int)
     classes = np.unique(y)
     C = len(classes)  # Number of classes
     V = 2 # split into two groups
-    # print("👀 y dans g_stat:", y)
-    # print("🧾 type:", type(y), "| shape:", np.shape(y), "| dtype:", np.array(y).dtype)
-    # print("🔢 valeurs uniques:", np.unique(y))
 
     n_c = np.bincount(y)  # Count of each class in the total group
     N = len(X_column)  # Total number of elements
@@ -314,29 +282,37 @@ def dcsm(y, X_column, threshold):
 
 # Gene 7: Chi Square
 def chi_square(y, X_column, threshold):
-    # Ensure y is 1D array of integers
     y = np.array(y)
     if y.ndim > 1:
         y = y.ravel()
-    if not np.issubdtype(y.dtype, np.integer):
-        y = LabelEncoder().fit_transform(y)
-    
-    X_column = np.asarray(X_column).ravel()
 
+    if y.size == 0:
+         return 0.0
+    y_encoded = LabelEncoder().fit_transform(y)
+    num_classes = len(np.unique(y_encoded)) 
+
+
+    X_column = np.asarray(X_column).ravel()
     left_indices = X_column <= threshold
     right_indices = X_column > threshold
 
-    # counts classes occurrences 
-    left_counts = np.bincount(y[left_indices], minlength=np.max(y) + 1)
-    right_counts = np.bincount(y[right_indices], minlength=np.max(y) + 1)
-    observed = np.array([left_counts, right_counts])  # contingency table, how many times each class appears in subgroups after split
-    observed = np.maximum(observed, 1e-6)  # Replace 0 by small values to manage calculation problems 
+    if not np.any(left_indices) or not np.any(right_indices):
+         return 0.0
 
-    # calculate expected frequencies 
-    expected = np.outer(np.sum(observed, axis=1), np.sum(observed, axis=0)) / np.sum(observed)
-    chi2_stat, p_value, dof, expected = chi2_contingency(observed, correction=False)  # calculates chi-square on contingency table
+    left_counts = np.bincount(y_encoded[left_indices], minlength=num_classes)
+    right_counts = np.bincount(y_encoded[right_indices], minlength=num_classes)
 
+    observed = np.array([left_counts, right_counts])
+
+    try:
+        chi2_stat, p_value, dof, expected = chi2_contingency(observed, correction=True)
+
+    except ValueError as e:
+        warnings.warn(f"chi2_contingency a levé une erreur : {e}. Retourne 0.0.")
+        return 0.0
+    
     return chi2_stat
+
 
 # Gene 8: Mean Posterior Improvement 
 def mpi(y, X_column, threshold):
@@ -683,5 +659,3 @@ class SplitCriterion:
     # Gene 14: Gain Ratio
     def _gain_ratio(self, y, X_column, threshold):
         return gain_ratio(y, X_column, threshold)
-    
-    

@@ -7,7 +7,10 @@ Created on Fri Mar 28 14:14:37 2025
 import pandas as pd
 import numpy as np
 from collections import defaultdict
-from Split_Criteria import SplitCriterion
+import random
+
+random.seed(42)
+np.random.seed(42)
 
 class MissingValues:
     def __init__(self, mv_split='ignore_all', mv_distrib='ignore_all', mv_classif='explore_all', split_criterion=None):
@@ -29,8 +32,7 @@ class MissingValues:
             return self.impute_mv_class_split(X, y, feature)
         else:
             raise ValueError(f"Unsupported criterion: {self.mv_split}")
-            
-    ####
+
     def _standardize_feature_name(self, feature):
         if isinstance(feature, str) and feature.isdigit():
             return int(feature)
@@ -66,16 +68,32 @@ class MissingValues:
         X_copy[feature] = X_copy[feature].fillna(fill_value)
         return X_copy, y, X_copy[feature]
 
-    # Gene 2: Weight Splitting Criterion
-    def weight_split(self, X, y, feature):
+    # Gene 2: Weight Splitting Criterion     
+    def weight_split(self, X, y, feature, threshold):
         feature = self._standardize_feature_name(feature)
         if isinstance(feature, str) and feature.isdigit():
             feature = int(feature)
-        proportion_missing = X[feature].isnull().mean()
-        criterion_value = self.split_criteria.calculate(X.to_numpy(), y, int(feature))
-        adjusted_value = criterion_value * (1 - proportion_missing)
-        return adjusted_value
     
+        proportion_missing = X[feature].isnull().mean()
+    
+        # Filter nan values in y to calculate split criterion
+        mask_valid = ~X[feature].isnull()
+        X_temp = X[mask_valid]
+        y_temp = pd.Series(y)[mask_valid]
+    
+        # Erase nan values in y
+        final_mask = ~y_temp.isnull()
+        X_clean = X_temp[final_mask]
+        y_clean = y_temp[final_mask]
+        # print("👀 y_clean dans weight_split:", y_clean)
+        
+        X_column = X_clean[feature]
+
+        gain = self.split_criteria.calculate(y_clean.to_numpy(), X_column.to_numpy(), threshold)
+        adjusted_gain = gain * (1 - proportion_missing)
+    
+        return adjusted_gain
+
     # Gene 3: Impute Missing Values with mode/mean of instances of same class
     def impute_mv_class_split(self, X, y, feature):
         """ 
@@ -293,14 +311,15 @@ class MissingValues:
             right_split = (
                 right_split[0],
                 pd.Series(right_split[1], index=right_split[0].index)
-            )
+            )     
         left_split = (
-            pd.concat([left_split[0], X_missing.sample(frac=left_prob)]),
-            pd.concat([left_split[1], y_missing.sample(frac=left_prob)])
+            pd.concat([left_split[0], X_missing.sample(frac=left_prob, random_state=42)]),
+            pd.concat([left_split[1], y_missing.sample(frac=left_prob, random_state=42)])
         )
+        
         right_split = (
-            pd.concat([right_split[0], X_missing.sample(frac=right_prob)]),
-            pd.concat([right_split[1], y_missing.sample(frac=right_prob)])
+            pd.concat([right_split[0], X_missing.sample(frac=right_prob, random_state=42)]),
+            pd.concat([right_split[1], y_missing.sample(frac=right_prob, random_state=42)])
         )
         return left_split, right_split
     
@@ -416,3 +435,4 @@ class MissingValues:
     #     else:
     #         return self._predict_stop_and_vote(inputs, node.right)  # Traverse right
 
+    

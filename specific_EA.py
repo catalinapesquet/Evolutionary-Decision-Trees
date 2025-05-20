@@ -18,21 +18,22 @@ from pymoo.termination import get_termination
 from encode_decode import decode
 from metrics import evaluate_tree 
 
+import numpy as np
+import random
+
 import datetime
 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
  
 # PARAMETERS
 dataset="anneal"
-pop_size = 50
-n_gen = 50
+pop_size = 100
+n_gen = 100
 
 # LOAD DATA 
 # Split into train/test sets
 X_train, X_test, y_train, y_test = extract_data(dataset)
 
 # DEFINE PROBLEM
-
-import numpy as np
 class TreeProblem(ElementwiseProblem):
     def __init__(self, X_train, y_train, X_test, y_test, objectives):
         self.X_train = X_train
@@ -97,7 +98,7 @@ termination = get_termination("n_gen", n_gen)
 res = minimize(problem,
                algorithm,
                termination,
-               seed=40,
+               seed=42,
                verbose=True,
                save_history=True)
 

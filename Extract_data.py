@@ -266,3 +266,9 @@ def extract_data(dataset):
     y_train = y_train[mask_train]
         
     return X_train, X_test, y_train, y_test
+
+X_train0, X_test0, y_train0, y_test0 = extract_data("anneal")
+X_train1, X_test1, y_train1, y_test1 = extract_data("anneal")
+X_train2, X_test2, y_train2, y_test2 = extract_data("anneal")
+X_train3, X_test3, y_train3, y_test3 = extract_data("anneal")
+X_train4, X_test4, y_train4, y_test4 = extract_data("anneal")

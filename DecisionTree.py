@@ -59,7 +59,7 @@ class DecisionTree:
         
     def fit(self, X, y):
         self.n_classes_ = len(np.unique(y))
-        self.n_features_ = X.shape[1]
+        self.n_features_ = X.shape[1] 
         # size of total dataset
         n_tot_samples = len(y)
         self.stopping_criteria = StoppingCriterion(n_tot_samples = n_tot_samples, 
@@ -85,6 +85,8 @@ class DecisionTree:
     
         # Stopping condition
         if self.stopping_criteria.stop(n_tot_samples, y, depth):
+            # print(f"🛑 Stopping split at depth {depth}")
+            # print(f"  Samples: {len(y)}, Classes: {np.unique(y)}")
             return Node(value=majority_class, is_leaf=True)
     
         # Best split
@@ -101,6 +103,8 @@ class DecisionTree:
             leaf_value = self._most_common_label(y[left_idxs])
             return Node(value=leaf_value, is_leaf=True)
     
+        # print(f" Recursing left: depth={depth+1}, size={len(y[left_idxs])}")
+        # print(f" Recursing right: depth={depth+1}, size={len(y[right_idxs])}")
         # Recursive growth
         left = self._grow_tree(X[left_idxs, :], y[left_idxs], n_tot_samples, depth + 1)
         right = self._grow_tree(X[right_idxs, :], y[right_idxs], n_tot_samples, depth + 1)
@@ -150,6 +154,7 @@ class DecisionTree:
             if self.mv_handler.mv_split == 'weight_split':
                 thresholds = np.sort(np.unique(X_column))
                 thresholds = (thresholds[:-1] + thresholds[1:]) / 2
+                thresholds = np.sort(thresholds)
                 for threshold in thresholds:
                     left_indices_temp, right_indices_temp = self._split(X_column, threshold)
                     if len(left_indices_temp) == 0 or len(right_indices_temp) == 0:
@@ -163,13 +168,25 @@ class DecisionTree:
                     if gain <= 0:
                         continue
     
-                    if gain > best_gain or (gain == best_gain and split_idx is None):
+                    if gain > best_gain:
                         best_gain = gain
                         split_idx = feat_idx
                         split_threshold = threshold
                         left_idxs = left_indices_temp
                         right_idxs = right_indices_temp
-    
+                    
+                    # Handle case where we have the same gain for multiple thresholds
+                    elif gain == best_gain:
+                        # print(f"✳️ Tie detected: feature {feat_idx}, threshold {threshold}, gain {gain}")
+                        # We choose to give priority to the smallest feat_idx and smallest threshold
+                        if split_idx is None or (feat_idx, threshold) < (split_idx, split_threshold):
+                            split_idx = feat_idx
+                            split_threshold = threshold
+                            left_idxs = left_indices_temp
+                            right_idxs = right_indices_temp
+            
+        
+            # All other cases             
             else:
                 try:
                     X_filtered, y_filtered, X_feature_column = self.mv_handler.handle_split(
@@ -213,20 +230,29 @@ class DecisionTree:
                     
                     if gain <= 0:
                         continue
-    
-                    if gain > best_gain or (gain == best_gain and split_idx is None):
+                    
+                    # When we find a better split
+                    if gain > best_gain:
                         best_gain = gain
                         split_idx = feat_idx
                         split_threshold = threshold
         
                         mask = X_column_filtered <= threshold
-                        left_idxs = X_filtered[mask].index.to_numpy()
-                        right_idxs = X_filtered[~mask].index.to_numpy()
-    
+                        left_idxs = np.sort(X_filtered[mask].index.to_numpy())
+                        right_idxs = np.sort(X_filtered[~mask].index.to_numpy())
+                        
+                    elif gain == best_gain:
+                        # print(f"✳️ Tie detected: feature {feat_idx}, threshold {threshold}, gain {gain}")
+                        if split_idx is None or (feat_idx, threshold) < (split_idx, split_threshold):
+                            split_idx = feat_idx
+                            split_threshold = threshold
+                            left_idxs = left_indices_temp
+                            right_idxs = right_indices_temp
+                            
         if split_idx is not None:
             # DEBUGGING
             # print(f"✅ Selected split: Feature {split_idx} | Threshold: {split_threshold} | Gain: {best_gain:.4f}")
-            # print(f"Left size: {len(left_idxs)}, Right size: {len(right_idxs)}")
+            # print(f"Left size: {len(left_idxs)}, Contains classes: {np.unique(y[left_idxs])}// Right size: {len(right_idxs)}, Contains classes: {np.unique(y[right_idxs])}")
             return split_idx, split_threshold, left_idxs, right_idxs
         
         # DEBUGGING
@@ -246,8 +272,8 @@ class DecisionTree:
         return most_common
 
     def _split(self, X_column, split_threshold):
-        left_indices = np.argwhere(X_column <= split_threshold).flatten()
-        right_indices = np.argwhere(X_column > split_threshold).flatten()
+        left_indices = np.sort(np.argwhere(X_column <= split_threshold).flatten())
+        right_indices = np.sort(np.argwhere(X_column > split_threshold).flatten())
         return left_indices, right_indices
     
     def predict(self, X):
