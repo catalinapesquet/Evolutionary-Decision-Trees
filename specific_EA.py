@@ -27,8 +27,8 @@ timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
  
 # PARAMETERS
 dataset="car"
-pop_size = 10
-n_gen = 10
+pop_size = 30
+n_gen = 30
 objectives = ["f1", "n_nodes", "recall"] 
 
 # LOAD DATA 

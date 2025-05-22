@@ -27,8 +27,8 @@ timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
 # PARAMETERS
 dataset_names = ["audiology", "car", "glass"]
-pop_size = 100
-n_gen = 500
+pop_size = 20
+n_gen = 20
 objectives = ["recall", "specificity", "n_nodes"]
 
 algorithm = NSGA2(pop_size=pop_size,
@@ -242,9 +242,6 @@ plt.show()
 mean_nodes = np.mean(res.F[:,1])
 mean_f1 = np.mean(res.F[:,0])
 
-print(f"mean nodes : {mean_nodes}")
-print(f"mean f1 : {mean_f1}")
-
 filename = f"log/results_2obj_{timestamp}.txt"
 with open(filename, "w") as f:
     f.write(f"Solutions:\n{res.X}\n")
@@ -276,15 +273,29 @@ with open(filename, "w") as f:
 
 
 # SAVE RESULTS
-mean_obj1 = np.mean(res.F[:,1])
-mean_obj2 = np.mean(res.F[:,0])
+if len(objectives)==2:
+    mean_obj1 = np.mean(res.F[:,1])
+    mean_obj2 = np.mean(res.F[:,0])
 
-print(f"mean {objectives[0]} : {mean_obj1}")
-print(f"mean {objectives[1]} : {mean_obj2}")
+    print(f"mean {objectives[0]} : {mean_obj1}")
+    print(f"mean {objectives[1]} : {mean_obj2}")
+if len(objectives)==3:
+    mean_obj1 = np.mean(res.F[:,0])
+    mean_obj2 = np.mean(res.F[:,1])
+    mean_obj3 = np.mean(res.F[:,2])
+
+    print(f"mean {objectives[0]} : {mean_obj1}")
+    print(f"mean {objectives[1]} : {mean_obj2}")
+    print(f"mean {objectives[2]} : {mean_obj3}")
 
 
-def knee_point(res, W=[0.5, 0.5]):
+
+def knee_point(res, objectives):
+    n_obj = len(objectives)
+
+    W = np.full(n_obj, 1.0 / n_obj)
+
     U = [np.dot(W, obj_vec) for obj_vec in res.F]
-    best_idx = np.argmin(U)
 
+    best_idx = np.argmin(U)
     return res.X[best_idx], best_idx
