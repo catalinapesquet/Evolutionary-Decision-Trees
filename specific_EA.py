@@ -19,15 +19,17 @@ from encode_decode import decode
 from metrics import evaluate_tree 
 
 import numpy as np
-import random
+import matplotlib.pyplot as plt
+from pymoo.indicators.hv import HV
 
 import datetime
 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
  
 # PARAMETERS
-dataset="anneal"
-pop_size = 100
-n_gen = 100
+dataset="car"
+pop_size = 10
+n_gen = 10
+objectives = ["f1", "n_nodes", "recall"] 
 
 # LOAD DATA 
 # Split into train/test sets
@@ -52,7 +54,7 @@ class TreeProblem(ElementwiseProblem):
                     "gene_6": Choice(options=np.arange(6)),   # pruning strategy
                     "gene_7": Choice(options=np.arange(101))  # pruning parameter
                 }
-        super().__init__(vars=vars, n_obj=2)
+        super().__init__(vars=vars, n_obj=len(objectives))
     
     def _evaluate(self, x, out, *args, **kwargs):
         try:
@@ -78,19 +80,23 @@ class TreeProblem(ElementwiseProblem):
         except Exception as e:
             print(f"Error for x = {x} : {e}", flush=True)
             # In case of fail in the construction of the tree
-            out["F"] = [1.0, 999]
+            if len(objectives==2):
+                out["F"] = [1.0, 999]
+            elif len(objectives==3):
+                out["F"] = [1.0, 999, 1.0]
+                
 
 algorithm = NSGA2(pop_size=pop_size,
                   sampling=ChoiceRandomSampling(),
                   crossover=SinglePointCrossover(prob=0.9),
-                  mutation=ChoiceRandomMutation(prob=0.3),
+                  mutation=ChoiceRandomMutation(prob=0.1),
                   eliminate_duplicates=True)
 problem = TreeProblem(
     X_train=X_train,
     y_train=y_train,
     X_test=X_test,
     y_test=y_test,
-    objectives=["f1", "n_nodes"]  
+    objectives=objectives 
 )
 
 termination = get_termination("n_gen", n_gen)
@@ -103,8 +109,6 @@ res = minimize(problem,
                save_history=True)
 
 # PLOTS
-import matplotlib.pyplot as plt
-from pymoo.indicators.hv import HV
 
 # Extract Pareto fronts from each generation
 fronts_per_gen = []
@@ -113,64 +117,115 @@ for algo in res.history:
     if hasattr(algo, 'pop') and algo.pop is not None:
         fronts_per_gen.append(algo.pop.get("F"))
         X_per_gen.append(algo.pop.get("X"))
-
+    
 print(f"Number of extracted Pareto fronts: {len(fronts_per_gen)}")
 
-# 2. Plot Pareto fronts every 10 generations (2D plot)
-step = 10  # Plot every 10 generations
-gens_to_plot = list(range(0, len(fronts_per_gen), step))
+if fronts_per_gen[0].shape[1] == 2:
+    # Plot Pareto fronts every 10 generations (2D plot)
+    step = 10  # Plot every 10 generations
+    gens_to_plot = list(range(0, len(fronts_per_gen), step))
+    
+    n_cols = 4
+    n_rows = int(np.ceil(len(gens_to_plot) / n_cols))
+    
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(5 * n_cols, 4 * n_rows))
+    axes = axes.flatten()
+    
+    for idx, gen_idx in enumerate(gens_to_plot):
+        front = fronts_per_gen[gen_idx]
+        ax = axes[idx]
+        sc = ax.scatter(front[:, 0], front[:, 1], color='mediumaquamarine', s=20)
+        ax.set_title(f"Generation {gen_idx+1}")
+        ax.set_xlabel("f1")
+        ax.set_ylabel("nodes")
+        ax.grid(True)
+    
+    # Remove empty plots
+    for j in range(len(gens_to_plot), len(axes)):
+        fig.delaxes(axes[j])
+    
+    fig.suptitle("Pareto Fronts across generations (2 objectives)", fontsize=20)
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    plt.show()
+    
+    
+    # Plot only the 4 first generations
+    gens_to_plot = list(range(0, min(4, len(fronts_per_gen))))
+    
+    fig, axes = plt.subplots(1, len(gens_to_plot), figsize=(5 * len(gens_to_plot), 4))
+    
+    for idx, gen_idx in enumerate(gens_to_plot):
+        front = fronts_per_gen[gen_idx]
+        ax = axes[idx]
+        sc = ax.scatter(front[:, 0], front[:, 1], color='mediumaquamarine', s=20)
+        ax.set_title(f"Generation {gen_idx+1}")
+        ax.set_xlabel("F1 Score")
+        ax.set_ylabel("Nodes")
+        ax.grid(True)
+    
+    fig.suptitle("First 4 Generations (2D Pareto Front)", fontsize=20)
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    filename = f"4gen_2obj_{dataset}_{timestamp}.png"
+    plt.savefig(f"C:/Users/Aurora/Desktop/DecisionTreesEA/DT/log/{filename}", dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    # Plot the first 10 generations if available
+    gens_to_plot = list(range(min(10, len(fronts_per_gen))))
+    
+    n_cols = 5
+    n_rows = int(np.ceil(len(gens_to_plot) / n_cols))
+    
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(5 * n_cols, 4 * n_rows))
+    axes = axes.flatten()
+    
+    for idx, gen_idx in enumerate(gens_to_plot):
+        front = fronts_per_gen[gen_idx]
+        ax = axes[idx]
+        sc = ax.scatter(front[:, 0], front[:, 1], color='mediumaquamarine', s=20)
+        ax.set_title(f"Generation {gen_idx+1}")
+        ax.set_xlabel("Recall")
+        ax.set_ylabel("F1 Score")
+        ax.grid(True)
+    
+    # Remove empty plots
+    for j in range(len(gens_to_plot), len(axes)):
+        fig.delaxes(axes[j])
+        
+    
+    fig.suptitle("First 10 Generations (2D Pareto Front)", fontsize=20)
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    filename = f"plot_2obj_{dataset}_{timestamp}.png"
+    plt.savefig(f"C:/Users/Aurora/Desktop/DecisionTreesEA/DT/log/{filename}", dpi=300, bbox_inches='tight')
+    plt.show()
 
-n_cols = 4
-n_rows = int(np.ceil(len(gens_to_plot) / n_cols))
+# 3 Objectives
+if fronts_per_gen[0].shape[1] == 3:
+    step = 5  # Affiche 1 génération sur 5
+    gens_to_plot = list(range(0, len(fronts_per_gen), step))
 
-fig, axes = plt.subplots(n_rows, n_cols, figsize=(5 * n_cols, 4 * n_rows))
-axes = axes.flatten()
+    n_cols = 2
+    n_rows = int(np.ceil(len(gens_to_plot) / n_cols))
 
-for idx, gen_idx in enumerate(gens_to_plot):
-    front = fronts_per_gen[gen_idx]
-    ax = axes[idx]
-    sc = ax.scatter(front[:, 0], front[:, 1], color='mediumaquamarine', s=20)
-    ax.set_title(f"Generation {gen_idx+1}")
-    ax.set_xlabel("f1")
-    ax.set_ylabel("nodes")
-    ax.grid(True)
+    fig = plt.figure(figsize=(6 * n_cols, 5 * n_rows))
 
-# Remove empty plots
-for j in range(len(gens_to_plot), len(axes)):
-    fig.delaxes(axes[j])
+    for idx, gen_idx in enumerate(gens_to_plot):
+        ax = fig.add_subplot(n_rows, n_cols, idx + 1, projection='3d')
+        front = fronts_per_gen[gen_idx]
+        ax.scatter(front[:, 0], front[:, 1], front[:, 2], color='teal', s=20)
+        ax.set_title(f"Generation {gen_idx+1}")
+        ax.set_xlabel(objectives[0])
+        ax.set_ylabel(objectives[1])
+        ax.set_zlabel(objectives[2])
+        ax.grid(True)
 
-fig.suptitle("Pareto Fronts across generations (2 objectives)", fontsize=20)
-plt.tight_layout(rect=[0, 0, 1, 0.95])
-plt.show()
-
-
-# Plot only the 4 first generations
-gens_to_plot = list(range(0, min(4, len(fronts_per_gen))))
-
-fig, axes = plt.subplots(1, len(gens_to_plot), figsize=(5 * len(gens_to_plot), 4))
-
-for idx, gen_idx in enumerate(gens_to_plot):
-    front = fronts_per_gen[gen_idx]
-    ax = axes[idx]
-    sc = ax.scatter(front[:, 0], front[:, 1], color='mediumaquamarine', s=20)
-    ax.set_title(f"Generation {gen_idx+1}")
-    ax.set_xlabel("F1 Score")
-    ax.set_ylabel("Nodes")
-    ax.grid(True)
-
-fig.suptitle("First 4 Generations (2D Pareto Front)", fontsize=20)
-plt.tight_layout(rect=[0, 0, 1, 0.95])
-filename = f"4gen_2obj_{dataset}_{timestamp}.png"
-plt.savefig(f"C:/Users/Aurora/Desktop/DecisionTreesEA/DT/log/{filename}", dpi=300, bbox_inches='tight')
-plt.show()
-
+    fig.suptitle("3D Pareto Fronts across Generations (3 Objectives)", fontsize=18)
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    plt.show()
 
 # Compute and plot Hypervolume evolution
 # Find the reference point
 all_points = np.vstack(fronts_per_gen)
 ref_point = np.max(all_points, axis=0) + 0.05  # Safety margin
-
-print(f"Reference point for HV: {ref_point}")
 
 # Compute hypervolume for each generation
 hv_indicator = HV(ref_point=ref_point)
@@ -187,42 +242,12 @@ filename = f"HV_2obj_{dataset}_{timestamp}.png"
 plt.savefig(f"C:/Users/Aurora/Desktop/DecisionTreesEA/DT/log/{filename}", dpi=300, bbox_inches='tight')
 plt.show()
 
-
-# Plot the first 10 generations if available
-gens_to_plot = list(range(min(10, len(fronts_per_gen))))
-
-n_cols = 5
-n_rows = int(np.ceil(len(gens_to_plot) / n_cols))
-
-fig, axes = plt.subplots(n_rows, n_cols, figsize=(5 * n_cols, 4 * n_rows))
-axes = axes.flatten()
-
-for idx, gen_idx in enumerate(gens_to_plot):
-    front = fronts_per_gen[gen_idx]
-    ax = axes[idx]
-    sc = ax.scatter(front[:, 0], front[:, 1], color='mediumaquamarine', s=20)
-    ax.set_title(f"Generation {gen_idx+1}")
-    ax.set_xlabel("Recall")
-    ax.set_ylabel("F1 Score")
-    ax.grid(True)
-
-# Remove empty plots
-for j in range(len(gens_to_plot), len(axes)):
-    fig.delaxes(axes[j])
-    
-
-fig.suptitle("First 10 Generations (2D Pareto Front)", fontsize=20)
-plt.tight_layout(rect=[0, 0, 1, 0.95])
-filename = f"plot_2obj_{dataset}_{timestamp}.png"
-plt.savefig(f"C:/Users/Aurora/Desktop/DecisionTreesEA/DT/log/{filename}", dpi=300, bbox_inches='tight')
-plt.show()
-
+# SAVING RESULTS
 mean_nodes = np.mean(res.F[:,1])
 mean_f1 = np.mean(res.F[:,0])
 
 print(f"mean nodes : {mean_nodes}")
 print(f"mean f1 : {mean_f1}")
-
 
 filename = f"log/results_2obj_{dataset}_{timestamp}.txt"
 
@@ -235,10 +260,8 @@ with open(filename, "w") as f:
 from collections import Counter
 import datetime
 
-# Supposons que res.X contient les vecteurs d'individus (shape: [n_indivs, n_genes])
 population = res.X  # ou np.array([...])
 
-# Titres des gènes dans l'ordre (adaptés à ta représentation)
 gene_titles = [
     "Splitting criteria",    # gene[0]
     "Stopping criteria",     # gene[1]
@@ -250,7 +273,6 @@ gene_titles = [
     "Pruning param"          # gene[7]
 ]
 
-# Création du fichier avec timestamp
 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 filename = f"log/gene_statistics_{dataset}_{timestamp}.txt"
 

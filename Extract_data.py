@@ -246,7 +246,46 @@ def extract_data(dataset):
         
     elif dataset == "hepatitis":
         path = "C:\\Users\\Aurora\\Desktop\\DecisionTreesEA\\dataset\\datasets\\hepatitis.data"
-        df = pd.read_csv(path, sep=";")
+        df = pd.read_csv(path, sep=",")
+        
+        # Name columns
+        df.columns = ["Class", "AGE", "SEX", "STEROID", "ANTIVIRALS", "FATIGUE",
+                      "MALAISE", "ANOREXIA", "LIVER BIG", "LIVER FIRM",
+                      "SPLEEN PALPABLE", "SPIDERS", "ASCITES", "VARICES", 
+                      "BILIRUBIN", "ALK PHOSPHATE", "SGOT", "ALBUMIN", "PROTIME",
+                      "HISTOLOGY", "classes"]
+        
+        # Replace "?" with np.nan to handle missing values
+        df.replace("?", np.nan, inplace=True)
+        
+        X = df.drop(columns=["classes"]).to_numpy().astype(np.float64)
+        y = df["classes"].to_numpy().astype(int)
+    
+    elif dataset == "iris":
+        path = "C:\\Users\\Aurora\\Desktop\\DecisionTreesEA\\dataset\\datasets\\iris.data"
+        df = pd.read_csv(path, sep=",")
+        
+        # Name columns
+        df.columns = ["Sepal Length", "Sepal Width", "Petal Length", "Petal Width",
+                      "classes"]
+        
+        df["classes"] = LabelEncoder().fit_transform(df["classes"].astype(str))
+        
+        X = df.drop(columns=["classes"]).to_numpy().astype(np.float64)
+        y = df["classes"].to_numpy().astype(int)
+        
+    elif dataset == "shuttle_landing":
+        path = "C:\\Users\\Aurora\\Desktop\\DecisionTreesEA\\dataset\\datasets\\shuttle_landing.data"
+        df = pd.read_csv(path, sep=",")
+        
+        # Name columns
+        df.columns = ["Stability", "Error", "Sign", "Wind", "Magnitude", 
+                      "Visibility", "classes"]
+        
+        df["classes"] = LabelEncoder().fit_transform(df["classes"].astype(str))
+        
+        X = df.drop(columns=["classes"]).to_numpy().astype(np.float64)
+        y = df["classes"].to_numpy().astype(int)
         
     # Stratified train-test split
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)
@@ -267,8 +306,12 @@ def extract_data(dataset):
         
     return X_train, X_test, y_train, y_test
 
-X_train0, X_test0, y_train0, y_test0 = extract_data("anneal")
-X_train1, X_test1, y_train1, y_test1 = extract_data("anneal")
-X_train2, X_test2, y_train2, y_test2 = extract_data("anneal")
-X_train3, X_test3, y_train3, y_test3 = extract_data("anneal")
-X_train4, X_test4, y_train4, y_test4 = extract_data("anneal")
+path = "C:\\Users\\Aurora\\Desktop\\DecisionTreesEA\\dataset\\datasets\\iris.data"
+df = pd.read_csv(path, sep=",")
+
+# Name columns
+df.columns = ["Sepal Length", "Sepal Width", "Petal Length", "Petal Width", "classes"]
+
+X = df.drop(columns=["classes"]).to_numpy().astype(np.float64)
+y = df["classes"].to_numpy()
+    

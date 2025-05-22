@@ -12,6 +12,10 @@ from Pruning_Strategies import Pruning
 
 import numpy as np
 import pandas as pd
+import random
+
+random.seed(42)
+np.random.seed(42)
 
 class DecisionTree:
     """
@@ -102,9 +106,11 @@ class DecisionTree:
         if len(right_idxs) == 0:
             leaf_value = self._most_common_label(y[left_idxs])
             return Node(value=leaf_value, is_leaf=True)
-    
+        
+        # DEBUGGING
         # print(f" Recursing left: depth={depth+1}, size={len(y[left_idxs])}")
         # print(f" Recursing right: depth={depth+1}, size={len(y[right_idxs])}")
+        
         # Recursive growth
         left = self._grow_tree(X[left_idxs, :], y[left_idxs], n_tot_samples, depth + 1)
         right = self._grow_tree(X[right_idxs, :], y[right_idxs], n_tot_samples, depth + 1)
@@ -161,6 +167,7 @@ class DecisionTree:
                         continue
     
                     gain = self.mv_handler.weight_split(X_df, y, feat_idx, threshold)
+                    # DEBUGGING
                     # print(f"Tested split - Feature {feat_idx} | Threshold: {threshold:.2f} | Gain: {gain:.4f}")
                     # if feat_idx == 4 or feat_idx == 11 :
                         # print(f"Tested split - Feature {feat_idx} | Threshold: {threshold:.2f} | Gain: {gain:.4f}")
@@ -177,6 +184,7 @@ class DecisionTree:
                     
                     # Handle case where we have the same gain for multiple thresholds
                     elif gain == best_gain:
+                        # DEBUGGING
                         # print(f"✳️ Tie detected: feature {feat_idx}, threshold {threshold}, gain {gain}")
                         # We choose to give priority to the smallest feat_idx and smallest threshold
                         if split_idx is None or (feat_idx, threshold) < (split_idx, split_threshold):

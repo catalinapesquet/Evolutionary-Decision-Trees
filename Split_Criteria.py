@@ -15,6 +15,7 @@ import pandas as pd
 from sklearn.preprocessing import LabelEncoder
 import warnings
 
+
 # Gene 0: Information Gain 
 def entropy(y):
     # get the unique class and their counts

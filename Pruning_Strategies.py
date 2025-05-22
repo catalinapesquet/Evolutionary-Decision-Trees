@@ -97,24 +97,26 @@ class Pruning:
 
         node.left = self._prune_node_rep(node.left, tree, X_val, y_val)
         node.right = self._prune_node_rep(node.right, tree, X_val, y_val)
-        
+
         error_before = self._evaluate_error(tree, X_val, y_val)
-        
-        node_copy = deepcopy(node)
-        node_copy.left = None
-        node_copy.right = None
-        node_copy.is_leaf = True
-        node_copy.leaf_value = node.majority_class
-        
-        tree_copy = deepcopy(tree)
 
-        error_after = self._evaluate_error(tree_copy, X_val, y_val)
+        original_left = node.left
+        original_right = node.right
+        original_leaf = node.is_leaf
+        original_leaf_value = node.leaf_value
 
-        if error_after <= error_before:
-            node.left = None
-            node.right = None
-            node.is_leaf = True
-            node.leaf_value = node.majority_class
+        node.left = None
+        node.right = None
+        node.is_leaf = True
+        node.leaf_value = node.majority_class
+
+        error_after = self._evaluate_error(tree, X_val, y_val)
+
+        if error_after > error_before:
+            node.left = original_left
+            node.right = original_right
+            node.is_leaf = original_leaf
+            node.leaf_value = original_leaf_value
 
         return node
     
