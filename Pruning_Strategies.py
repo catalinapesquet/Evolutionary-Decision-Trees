@@ -83,7 +83,7 @@ class Pruning:
         # Split data based on self.param
         param = (self.param * 0.4 + 10)/100 # Clamp between 10% and 50%
         val_size = param
-        X_train, X_prune, y_train, y_prune = train_test_split(X, y, test_size=val_size, stratify=y)
+        X_train, X_prune, y_train, y_prune = train_test_split(X, y, test_size=val_size, stratify=y, random_state=42)
         tree = self._prune_node_rep(tree, tree, X_prune, y_prune)
         return tree
     
@@ -97,26 +97,24 @@ class Pruning:
 
         node.left = self._prune_node_rep(node.left, tree, X_val, y_val)
         node.right = self._prune_node_rep(node.right, tree, X_val, y_val)
-
+        
         error_before = self._evaluate_error(tree, X_val, y_val)
+        
+        node_copy = deepcopy(node)
+        node_copy.left = None
+        node_copy.right = None
+        node_copy.is_leaf = True
+        node_copy.leaf_value = node.majority_class
+        
+        tree_copy = deepcopy(tree)
 
-        original_left = node.left
-        original_right = node.right
-        original_leaf = node.is_leaf
-        original_leaf_value = node.leaf_value
+        error_after = self._evaluate_error(tree_copy, X_val, y_val)
 
-        node.left = None
-        node.right = None
-        node.is_leaf = True
-        node.leaf_value = node.majority_class
-
-        error_after = self._evaluate_error(tree, X_val, y_val)
-
-        if error_after > error_before:
-            node.left = original_left
-            node.right = original_right
-            node.is_leaf = original_leaf
-            node.leaf_value = original_leaf_value
+        if error_after <= error_before:
+            node.left = None
+            node.right = None
+            node.is_leaf = True
+            node.leaf_value = node.majority_class
 
         return node
     
@@ -211,7 +209,7 @@ class Pruning:
     # Gene 3: CCP
     def _CCP(self, tree, X, y):
         val_size = min(max(self.param / 100.0, 0.1), 0.5)
-        X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=val_size, stratify=y)
+        X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=val_size, stratify=y, random_state=42)
         sequence = self._generate_ccp_sequence(tree, X_train, y_train)
         best_tree = self._select_best_ccp_tree(sequence, X_val, y_val)
         return best_tree
@@ -266,7 +264,7 @@ class Pruning:
     def _EBP(self, tree, X, y):
         """ Error-Based Pruning """
         val_size = min(max(self.param / 100.0, 0.1), 0.5)
-        X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=val_size, stratify=y)
+        X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=val_size, stratify=y, random_state=42)
 
         cf = max(min(self.param / 100, 0.5), 0.01)  # CF in [0.01, 0.5]
         z = norm.ppf(1 - cf)  # critical value for binomial upper bound
