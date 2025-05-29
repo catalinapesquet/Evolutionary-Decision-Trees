@@ -4,17 +4,16 @@ Created on Mon Apr 28 16:33:36 2025
 
 @author: Aurora
 """
-from DecisionTree import print_tree, export_tree_dot
 from encode_decode import decode
-from decode_small import decode_small
 from Extract_data import extract_data
 from metrics import evaluate_tree
 from sklearn import tree
 from sklearn.tree import DecisionTreeClassifier, export_text
 from sklearn.metrics import f1_score, recall_score, accuracy_score, confusion_matrix
+from Plot_tree import print_tree, export_tree_dot
 import matplotlib.pyplot as plt
 
-dataset = "ecoli"
+dataset = "audiology"
 X_train, X_test, y_train, y_test = extract_data(dataset)
 
 # def specificity(y_test, y_pred):
@@ -60,10 +59,10 @@ _ = tree.plot_tree(c45,
 
 # Our solution
 indiv_1 =  [6, 1, 0, 2, 4, 0, 4, 61]
-tree = decode(indiv_1)
+tree1 = decode(indiv_1)
 # print(f"indiv_1: {indiv_1}\n")
-print(f"\n Metrics_1 : {evaluate_tree(tree, X_train, y_train, X_test, y_test)}")
+print(f"\n Metrics_1 : {evaluate_tree(tree1, X_train, y_train, X_test, y_test)}")
 print("\n DT_1 Result")
-print_tree(tree.tree_)
-export_tree_dot(tree.tree_)
+print_tree(tree1.tree_)
+export_tree_dot(tree1.tree_)
 

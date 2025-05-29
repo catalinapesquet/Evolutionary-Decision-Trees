@@ -278,7 +278,7 @@ def dcsm(y, X_column, threshold):
 
     # calculate gain
     dcsm = left_term + right_term
-    gain =  1000 - dcsm
+    gain =10000 - dcsm
     return gain
 
 # Gene 7: Chi Square

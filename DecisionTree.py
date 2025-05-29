@@ -86,14 +86,16 @@ class DecisionTree:
         n_labels = len(np.unique(y))
     
         majority_class = self._most_common_label(y)
+        class_counts = np.bincount(y, minlength=self.n_classes_)
+        value_distribution = class_counts.tolist()
         if n_labels == 1 or len(y) <= 1:
-            return Node(value=majority_class, is_leaf=True)
+            return Node(main_value=majority_class, is_leaf=True)
     
         # Stopping condition
         if self.stopping_criteria.stop(n_tot_samples, y, depth):
             # print(f"🛑 Stopping split at depth {depth}")
             # print(f"  Samples: {len(y)}, Classes: {np.unique(y)}")
-            return Node(value=majority_class, is_leaf=True)
+            return Node(main_value=majority_class, is_leaf=True)
     
         # Best split
         split_idx, split_threshold, left_idxs, right_idxs, best_gain = self._best_split(X, y, n_samples, n_features)
@@ -122,9 +124,11 @@ class DecisionTree:
             threshold=split_threshold,
             left=left,
             right=right,
-            value=majority_class,
+            main_value=majority_class,
             is_leaf=False,
-            gain=best_gain
+            gain=best_gain,
+            samples=len(y),
+            value=value_distribution
         )
         node.left_weight = len(left_idxs) / (len(left_idxs) + len(right_idxs))
         node.right_weight = len(right_idxs) / (len(left_idxs) + len(right_idxs))
@@ -308,15 +312,19 @@ class DecisionTree:
     
     
 class Node:
-    def __init__(self, feat_idx=None, threshold=None, left=None, right=None, value=None, is_leaf=False, gain=None):
+    def __init__(self, feat_idx=None, threshold=None, left=None, right=None, 
+                 main_value=None, is_leaf=False, gain=None, samples=None, 
+                 value=None):
         self.feat_idx = feat_idx
         self.threshold = threshold
         self.left = left
         self.right = right
         self.is_leaf = is_leaf
-        self.leaf_value = value if is_leaf else None
-        self.majority_class = value  
+        self.leaf_value = main_value if is_leaf else None
+        self.majority_class = main_value  
         self.gain = gain
+        self.samples = samples
+        self.value = value
 
 def print_tree(node, depth=0, prefix=""):
     indent = "|   " * depth
@@ -350,7 +358,7 @@ def export_tree_dot(node, output_name="decision_tree"):
             color = "#B3E5FC"  
         else:
             label = (f"x[{node.feat_idx}] <= {node.threshold:.3f}\n"
-         f"gain: {node.gain:.4f}")
+         f"gain: {node.gain:.4f}\nsamples: {node.samples}\nvalue: {node.value}")
 
             color = get_color(node.gain)
 
