@@ -26,9 +26,9 @@ from collections import Counter
 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
 # PARAMETERS
-dataset_names = ["audiology", "car", "glass"]
-pop_size = 20
-n_gen = 20
+dataset_names = ["anneal", "audiology", "car"] # dermatology
+pop_size = 100
+n_gen = 500
 objectives = ["recall", "specificity", "n_nodes"]
 
 algorithm = NSGA2(pop_size=pop_size,
@@ -77,8 +77,8 @@ class MultiDatasetProblem(ElementwiseProblem):
                 # iterating through every dataset
                 for met in all_metrics:
                     val = met[obj]
-                    if obj in ['f1', 'recall', 'specificity']:  # à maximiser
-                        val = 1 - val  # inversion pour minimisation
+                    if obj in ['f1', 'recall', 'specificity']:  # to maximise
+                        val = 1 - val  # inversion for minimisation
                     obj_values.append(val)
                 avg_val = np.mean(obj_values)
                 averaged_values.append(avg_val)
@@ -195,10 +195,10 @@ if fronts_per_gen[0].shape[1] == 2:
 
 # 3 Objectives
 if fronts_per_gen[0].shape[1] == 3:
-    step = 5  # Affiche 1 génération sur 5
+    step = 10  # Affiche 1 génération sur 5
     gens_to_plot = list(range(0, len(fronts_per_gen), step))
 
-    n_cols = 2
+    n_cols = 5
     n_rows = int(np.ceil(len(gens_to_plot) / n_cols))
 
     fig = plt.figure(figsize=(6 * n_cols, 5 * n_rows))
@@ -273,21 +273,9 @@ with open(filename, "w") as f:
 
 
 # SAVE RESULTS
-if len(objectives)==2:
-    mean_obj1 = np.mean(res.F[:,1])
-    mean_obj2 = np.mean(res.F[:,0])
-
-    print(f"mean {objectives[0]} : {mean_obj1}")
-    print(f"mean {objectives[1]} : {mean_obj2}")
-if len(objectives)==3:
-    mean_obj1 = np.mean(res.F[:,0])
-    mean_obj2 = np.mean(res.F[:,1])
-    mean_obj3 = np.mean(res.F[:,2])
-
-    print(f"mean {objectives[0]} : {mean_obj1}")
-    print(f"mean {objectives[1]} : {mean_obj2}")
-    print(f"mean {objectives[2]} : {mean_obj3}")
-
+for i in range(res.F.shape[1]):
+    mean_val = np.mean(res.F[:, i])
+    print(f"mean Objective {i+1} : {mean_val}")
 
 
 def knee_point(res, objectives):

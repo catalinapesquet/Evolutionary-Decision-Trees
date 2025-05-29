@@ -13,6 +13,8 @@ from Pruning_Strategies import Pruning
 import numpy as np
 import pandas as pd
 import random
+from graphviz import Digraph
+import os
 
 random.seed(42)
 np.random.seed(42)
@@ -94,7 +96,7 @@ class DecisionTree:
             return Node(value=majority_class, is_leaf=True)
     
         # Best split
-        split_idx, split_threshold, left_idxs, right_idxs = self._best_split(X, y, n_samples, n_features)
+        split_idx, split_threshold, left_idxs, right_idxs, best_gain = self._best_split(X, y, n_samples, n_features)
         if split_idx is None:
             return Node(value=majority_class, is_leaf=True)
     
@@ -121,7 +123,8 @@ class DecisionTree:
             left=left,
             right=right,
             value=majority_class,
-            is_leaf=False
+            is_leaf=False,
+            gain=best_gain
         )
         node.left_weight = len(left_idxs) / (len(left_idxs) + len(right_idxs))
         node.right_weight = len(right_idxs) / (len(left_idxs) + len(right_idxs))
@@ -261,11 +264,11 @@ class DecisionTree:
             # DEBUGGING
             # print(f"✅ Selected split: Feature {split_idx} | Threshold: {split_threshold} | Gain: {best_gain:.4f}")
             # print(f"Left size: {len(left_idxs)}, Contains classes: {np.unique(y[left_idxs])}// Right size: {len(right_idxs)}, Contains classes: {np.unique(y[right_idxs])}")
-            return split_idx, split_threshold, left_idxs, right_idxs
+            return split_idx, split_threshold, left_idxs, right_idxs, best_gain
         
         # DEBUGGING
         # print("⛔️ No valid split found.")
-        return None, None, None, None
+        return None, None, None, None, None
 
     
         
@@ -300,21 +303,20 @@ class DecisionTree:
             return max(result.items(), key=lambda x: x[1])[0]
         elif self.mv_classif == 'most_probable_path':
             return self.mv_handler._predict_most_probable(inputs, self.tree_)
-        # elif self.mv_classif == 'stop_and_vote':
-        #     return self.mv_handler._predict_stop_and_vote(inputs, self.tree_)
         else:
             raise ValueError(f"Unknown mv_classification strategy: {self.mv_classif}")
     
     
 class Node:
-    def __init__(self, feat_idx=None, threshold=None, left=None, right=None, value=None, is_leaf=False):
+    def __init__(self, feat_idx=None, threshold=None, left=None, right=None, value=None, is_leaf=False, gain=None):
         self.feat_idx = feat_idx
         self.threshold = threshold
         self.left = left
         self.right = right
         self.is_leaf = is_leaf
         self.leaf_value = value if is_leaf else None
-        self.majority_class = value  # toujours défini
+        self.majority_class = value  
+        self.gain = gain
 
 def print_tree(node, depth=0, prefix=""):
     indent = "|   " * depth
@@ -325,4 +327,43 @@ def print_tree(node, depth=0, prefix=""):
         print_tree(node.left, depth + 1)
         print(f"{indent}|--- feature_{node.feat_idx} >  {node.threshold:.2f}")
         print_tree(node.right, depth + 1)
+
+
+def export_tree_dot(node, output_name="decision_tree"):
+
+    dot = Digraph(comment='Decision Tree', format='png')
+    dot.attr('node', shape='box', style='filled', fontname="helvetica")
+    
+    def get_color(gain):
+        if gain < 0.6:
+            return "#A2D5AB"  # green
+        elif gain < 1.2:
+            return "#FFCC99"  # orange 
+        else:
+            return "#FF9999"  # red
+
+    def recurse(node):
+        node_id = str(id(node))
+
+        if node.is_leaf:
+            label = f"class: {node.leaf_value}"
+            color = "#B3E5FC"  
+        else:
+            label = (f"x[{node.feat_idx}] <= {node.threshold:.3f}\n"
+         f"gain: {node.gain:.4f}")
+
+            color = get_color(node.gain)
+
+        dot.node(node_id, label=label, fillcolor=color)
+
+        if not node.is_leaf:
+            # Ajoute les arêtes avec labels
+            dot.edge(node_id, str(id(node.left)), label="True")
+            dot.edge(node_id, str(id(node.right)), label="False")
+            recurse(node.left)
+            recurse(node.right)
+
+    recurse(node)
+    output_path = dot.render(output_name, cleanup=True)
+    os.startfile(output_path)
 

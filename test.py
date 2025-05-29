@@ -4,44 +4,66 @@ Created on Mon Apr 28 16:33:36 2025
 
 @author: Aurora
 """
-from DecisionTree import print_tree
+from DecisionTree import print_tree, export_tree_dot
 from encode_decode import decode
 from decode_small import decode_small
 from Extract_data import extract_data
 from metrics import evaluate_tree
+from sklearn import tree
 from sklearn.tree import DecisionTreeClassifier, export_text
-import numpy as np
-import random
+from sklearn.metrics import f1_score, recall_score, accuracy_score, confusion_matrix
+import matplotlib.pyplot as plt
 
-# random.seed(42)
-# np.random.seed(42)
-
-
-dataset = "iris"
+dataset = "ecoli"
 X_train, X_test, y_train, y_test = extract_data(dataset)
 
-# sk_tree = DecisionTreeClassifier(
-#     criterion='entropy',
-#     max_depth=2)
-# sk_tree.fit(X_train, y_train)
-# print("\n Sklearn")
-# print(export_text(sk_tree))
+# def specificity(y_test, y_pred):
+#     cm = confusion_matrix(y_test, y_pred_cart)
+#     specificities = []
+    
+#     for i in range(len(cm)):
+#         # One-vs-All logic
+#         tn = cm.sum() - (cm[i, :].sum() + cm[:, i].sum() - cm[i, i])
+#         fp = cm[:, i].sum() - cm[i, i]
+#         fn = cm[i, :].sum() - cm[i, i]
+#         tp = cm[i, i]
+    
+#         spec = tn / (tn + fp) if (tn + fp) != 0 else 0.0
+#         specificities.append(spec)
 
-# tree_sk = decode_small([2, 1, 0, 0, 55])
-# print("\n Custom DT like Sklearn")
-# print(f"\n Metrics : {evaluate_tree(tree_sk, X_train, y_train, X_test, y_test)}")
-# print_tree(tree_sk.tree_)
+#     for i, spec in enumerate(specificities):
+#         print(f"Specificity for class {i}: {spec:.4f}")
+    
+# Cart
+cart = DecisionTreeClassifier(max_depth=2)
+cart.fit(X_train, y_train)
+y_pred_cart = cart.predict(X_test)
+f1 = f1_score(y_test, y_pred_cart, average='macro')
+recall = recall_score(y_test, y_pred_cart, average='macro')
+accuracy = accuracy_score(y_test, y_pred_cart)
+print(f"CART: F1 = {f1:.4f}, Recall = {recall:.4f}, Accuracy = {accuracy:.4f}")
+print(f"Number of nodes: {cart.tree_.node_count}")
+print(export_text(cart))
 
-indiv_1 =  [1, 0, 1, 1, 4, 1, 3, 66]
+# C4.5 approx with 'entropy'
+c45 = DecisionTreeClassifier(criterion='entropy', random_state=42, max_depth=2)
+c45.fit(X_train, y_train)
+y_pred_c45 = c45.predict(X_test)
+f1_c45 = f1_score(y_test, y_pred_c45, average='macro')
+recall_c45 = recall_score(y_test, y_pred_c45, average='macro')
+print(f"C4.5: F1 = {f1_c45:.4f}, Recall = {recall_c45:.4f}")
+print(f"Number of nodes: {c45.tree_.node_count}")
+print(export_text(c45))
+fig = plt.figure(figsize=(25,20))
+_ = tree.plot_tree(c45,
+                   filled=True)
+
+# Our solution
+indiv_1 =  [6, 1, 0, 2, 4, 0, 4, 61]
 tree = decode(indiv_1)
 # print(f"indiv_1: {indiv_1}\n")
 print(f"\n Metrics_1 : {evaluate_tree(tree, X_train, y_train, X_test, y_test)}")
 print("\n DT_1 Result")
 print_tree(tree.tree_)
+export_tree_dot(tree.tree_)
 
-# indiv_2 =  [2, 1, 1, 3, 0, 1, 4, 53]
-# tree = decode(indiv_1)
-# # print(f"indiv_1: {indiv_1}\n")
-# print(f"\n Metrics_2 : {evaluate_tree(tree, X_train, y_train, X_test, y_test)}")
-# print("\n DT_2 Result")
-# print_tree(tree.tree_)

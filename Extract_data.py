@@ -14,6 +14,8 @@ le = LabelEncoder()
 
 def extract_data(dataset):
     
+    # Bank of 15 datasets
+    
     X = None
     y = None
 
@@ -68,8 +70,14 @@ def extract_data(dataset):
         for col in categorical_cols:
             df[col] = LabelEncoder().fit_transform(df[col].astype(str))
         
+        # Remove rare classes (classes with only 1 sample)
+        y_labels = df["classes"]
+        class_counts = y_labels.value_counts()
+        rare_classes = class_counts[class_counts < 2].index.tolist()
+        df = df[~df["classes"].isin(rare_classes)]
+        
         # Split into features and target
-        X = df.drop(columns=["Classes"]).to_numpy()
+        X = df.drop(columns=["classes"]).to_numpy().astype(np.float64)
         y = df["Classes"].to_numpy().astype(int)
         
     elif dataset == "arrhythmia":
@@ -231,6 +239,49 @@ def extract_data(dataset):
         # Prepare X and y
         X = df.drop(columns=["classes"]).to_numpy().astype(np.float64)
         y = df["classes"].to_numpy().astype(int)
+    
+    elif dataset == "dermatology":
+        path = "C:\\Users\\Aurora\\Desktop\\DecisionTreesEA\\dataset\\datasets\\dermatology.data"
+        df = pd.read_csv(path, sep=",")
+        
+        # Replace "?" with np.nan to handle missing values
+        df.replace("?", np.nan, inplace=True)
+        
+        # Name columns
+        df.columns = ["erythema", "scaling", "definite borders", "itching", "koebner phenomenon", 
+                      "polygonal papules", "follicular papules", "oral mucosal involvement", 
+                      "knee and elbow involvement", "scalp involvement", "family history", 
+                      "melanin incontinence", "eosinophils in the infiltrate", "PNL infiltrate",
+                      "fibrosis of the papillary dermis", "exocytosis", "acanthosis", "hyperkeratosis",
+                      "parakeratosis", "clubbing of the rete ridges", "elongation of the rete ridges",
+                      "thinning of the suprapapillary epidermis", "spongiform pustule", 
+                      "munro microabcess", "focal hypergranulosis", "disappearance of the granular layer",
+                      "vacuolisation and damage of basal layer", "spongiosis", 
+                      "saw-tooth appearance of retes", "follicular horn plug", "perifollicular parakeratosis",
+                      "inflammatory monoluclear inflitrate", "band-like infiltrate", "age", "classes"]
+    
+        # Prepare X and y
+        X = df.drop(columns=["classes"]).to_numpy().astype(np.float64)
+        y = df["classes"].to_numpy().astype(int)
+
+    elif dataset == "ecoli":
+        path = "C:\\Users\\Aurora\\Desktop\\DecisionTreesEA\\dataset\\datasets\\ecoli.data"
+        df = pd.read_csv(path, delim_whitespace=True, header=None, on_bad_lines='skip')
+        
+        # Replace "?" with np.nan to handle missing values
+        df.replace("?", np.nan, inplace=True)
+
+        # Name columns
+        df.columns = ["Sequence Name", "mcg", "gvh", "lip", "chg", "aac", "alm1",
+                      "alm2", "classes"]
+        
+        # Encode
+        df["classes"] = LabelEncoder().fit_transform(df["classes"].astype(str))
+        df["Sequence Name"] = LabelEncoder().fit_transform(df["Sequence Name"].astype(str))
+    
+        # Prepare X and y
+        X = df.drop(columns=["classes"]).to_numpy().astype(np.float64)
+        y = df["classes"].to_numpy().astype(int)
         
     elif dataset == "glass":
         path = "C:\\Users\\Aurora\\Desktop\\DecisionTreesEA\\dataset\\datasets\\glass.data"
@@ -249,7 +300,7 @@ def extract_data(dataset):
         df = pd.read_csv(path, sep=",")
         
         # Name columns
-        df.columns = ["Class", "AGE", "SEX", "STEROID", "ANTIVIRALS", "FATIGUE",
+        df.columns = ["AGE", "SEX", "STEROID", "ANTIVIRALS", "FATIGUE",
                       "MALAISE", "ANOREXIA", "LIVER BIG", "LIVER FIRM",
                       "SPLEEN PALPABLE", "SPIDERS", "ASCITES", "VARICES", 
                       "BILIRUBIN", "ALK PHOSPHATE", "SGOT", "ALBUMIN", "PROTIME",
@@ -273,6 +324,31 @@ def extract_data(dataset):
         
         X = df.drop(columns=["classes"]).to_numpy().astype(np.float64)
         y = df["classes"].to_numpy().astype(int)
+    
+    elif dataset == "segment":
+        path = "C:\\Users\\Aurora\\Desktop\\DecisionTreesEA\\dataset\\datasets\\segment.data"
+        df = pd.read_csv(path, sep=",")
+        
+        # Name columns
+        df.columns = ["classes", "region-centroid-col", "region-centroid-row", 
+                      "region-pixel-count", "short-line-density-5", "short-line-density-2",
+                      "vedge-mean", "vegde-sd", "hedge-mean", "hedge-sd", "intensity-mean",
+                      "rawred-mean", "rawblue-mean", "rawgreen-mean", "exred-mean",
+                      "exblue-mean", "exgreen-mean", "value-mean", "saturatoin-mean",
+                      "hue-mean"]
+        
+        X = df.drop(columns=["classes"]).to_numpy().astype(np.float64)
+        y = le.fit_transform(df["classes"])
+    
+    elif dataset == "semeion":
+        path = "C:\\Users\\Aurora\\Desktop\\DecisionTreesEA\\dataset\\datasets\\semeion.data"
+        df = pd.read_csv(path, sep=" ")
+        df = df.dropna(axis=1, how='all')
+        
+        X = df.iloc[:, :256].values  
+        y_onehot = df.iloc[:, 256:].values  
+        
+        y = np.argmax(y_onehot, axis=1)
         
     elif dataset == "shuttle_landing":
         path = "C:\\Users\\Aurora\\Desktop\\DecisionTreesEA\\dataset\\datasets\\shuttle_landing.data"
@@ -281,11 +357,49 @@ def extract_data(dataset):
         # Name columns
         df.columns = ["Stability", "Error", "Sign", "Wind", "Magnitude", 
                       "Visibility", "classes"]
+        # Replace "*" with np.nan to handle missing values
+        df.replace("*", np.nan, inplace=True)
         
         df["classes"] = LabelEncoder().fit_transform(df["classes"].astype(str))
         
         X = df.drop(columns=["classes"]).to_numpy().astype(np.float64)
         y = df["classes"].to_numpy().astype(int)
+    
+    elif dataset == "vowel":
+        path = "C:\\Users\\Aurora\\Desktop\\DecisionTreesEA\\dataset\\datasets\\vowel.data"
+        df = pd.read_csv(path, sep=",")
+        
+        df.columns = ["classes", "x-box", "y-box", "width", "high", 
+                      "onpix", "x-bar", "y-bar", "x2bar", "y2bar",
+                      "xybar", "x2ybr", "xy2br", "X-ege", "xegvy",
+                      "y-ege", "yegvx"]
+        
+        df["classes"] = LabelEncoder().fit_transform(df["classes"].astype(str))
+        
+        X = df.drop(columns=["classes"]).to_numpy().astype(np.float64)
+        y = df["classes"].to_numpy().astype(int)
+        
+    elif dataset == "winequality-red":
+        path = "C:\\Users\\Aurora\\Desktop\\DecisionTreesEA\\dataset\\datasets\\winequality-red.csv"
+        df = pd.read_csv(path, sep=";")
+        
+        # Split into features and target
+        X = df[["fixed acidity", "volatile acidity", "citric acid", 
+                "residual sugar", "chlorides", "free sulfur dioxide",
+                "total sulfur dioxide", "density", "pH", "sulphates",
+                "alcohol"]].to_numpy()
+        y = df["quality"].to_numpy().astype(int)
+        
+    elif dataset == "winequality-white":
+        path = "C:\\Users\\Aurora\\Desktop\\DecisionTreesEA\\dataset\\datasets\\winequality-white.csv"
+        df = pd.read_csv(path, sep=";")
+
+        # Split into features and target
+        X = df[["fixed acidity", "volatile acidity", "citric acid", 
+                "residual sugar", "chlorides", "free sulfur dioxide",
+                "total sulfur dioxide", "density", "pH", "sulphates",
+                "alcohol"]].to_numpy()
+        y = df["quality"].to_numpy().astype(int)
         
     # Stratified train-test split
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)
@@ -305,13 +419,3 @@ def extract_data(dataset):
     y_train = y_train[mask_train]
         
     return X_train, X_test, y_train, y_test
-
-path = "C:\\Users\\Aurora\\Desktop\\DecisionTreesEA\\dataset\\datasets\\iris.data"
-df = pd.read_csv(path, sep=",")
-
-# Name columns
-df.columns = ["Sepal Length", "Sepal Width", "Petal Length", "Petal Width", "classes"]
-
-X = df.drop(columns=["classes"]).to_numpy().astype(np.float64)
-y = df["classes"].to_numpy()
-    
