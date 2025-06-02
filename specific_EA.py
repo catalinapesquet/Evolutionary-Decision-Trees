@@ -28,7 +28,7 @@ import datetime
 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
  
 # PARAMETERS
-dataset="anneal"
+dataset="car"
 pop_size = 100
 n_gen = 500
 objectives = ["specificity", "recall", "n_nodes"] 

@@ -71,13 +71,13 @@ def extract_data(dataset):
             df[col] = LabelEncoder().fit_transform(df[col].astype(str))
         
         # Remove rare classes (classes with only 1 sample)
-        y_labels = df["classes"]
+        y_labels = df["Classes"]
         class_counts = y_labels.value_counts()
         rare_classes = class_counts[class_counts < 2].index.tolist()
-        df = df[~df["classes"].isin(rare_classes)]
+        df = df[~df["Classes"].isin(rare_classes)]
         
         # Split into features and target
-        X = df.drop(columns=["classes"]).to_numpy().astype(np.float64)
+        X = df.drop(columns=["Classes"]).to_numpy().astype(np.float64)
         y = df["Classes"].to_numpy().astype(int)
         
     elif dataset == "arrhythmia":

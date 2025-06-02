@@ -18,7 +18,24 @@ def print_tree(node, depth=0):
         print_tree(node.right, depth + 1)
 
 
+# def color_brew(n):
+#     s, v = 0.75, 0.9
+#     c = s * v
+#     m = v - c
+#     color_list = []
+#     for h in np.arange(25, 385, 360.0 / n).astype(int):
+#         h_bar = h / 60.0
+#         x = c * (1 - abs((h_bar % 2) - 1))
+#         rgb = [
+#             (c, x, 0), (x, c, 0), (0, c, x), (0, x, c), (x, 0, c), (c, 0, x), (c, x, 0)
+#         ]
+#         r, g, b = rgb[int(h_bar)]
+#         color_list.append([int(255 * (r + m)), int(255 * (g + m)), int(255 * (b + m))])
+#     return color_list
+
 def color_brew(n):
+    if n <= 0:
+        n = 1  # Sécurité : au moins une couleur pour éviter la division par zéro
     s, v = 0.75, 0.9
     c = s * v
     m = v - c
@@ -37,8 +54,8 @@ def color_brew(n):
 def get_n_classes(node):
     classes = set()
     def traverse(n):
-        if n.value is not None:
-            classes.update(range(len(n.value)))
+        if n.class_distribution is not None:
+            classes.update(range(len(n.class_distribution)))
         if not n.is_leaf:
             traverse(n.left)
             traverse(n.right)
@@ -55,10 +72,7 @@ def export_tree_dot(node, output_name="decision_tree"):
     class_colors = ['#%02x%02x%02x' % tuple(rgb) for rgb in raw_colors]
 
     def get_color(n):
-        # if n.is_leaf or n.value is None:
-        #     return "#C0C0C0"
-        # else:
-        index = np.argmax(n.value)
+        index = np.argmax(n.class_distribution)
         return class_colors[index]
 
     def recurse(n):

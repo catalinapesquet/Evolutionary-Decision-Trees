@@ -84,45 +84,47 @@ class DecisionTree:
         n_labels = len(np.unique(y))
 
         majority_class = self._most_common_label(y)
+        value_distribution = np.bincount(y, minlength=self.n_classes_)
+        
         if n_labels == 1 or len(y) <= 1:
-            return Node(value=majority_class, is_leaf=True)
+            return Node(value=majority_class, class_distribution=value_distribution, 
+                        is_leaf=True, samples=len(y))
 
         # Stopping condition
         if self.stopping_criteria.stop(n_tot_samples, y, depth):
             # print(f"🛑 Stopping split at depth {depth}")
             # print(f"  Samples: {len(y)}, Classes: {np.unique(y)}")
-            return Node(value=majority_class, is_leaf=True)
+            return Node(value=majority_class, class_distribution=value_distribution,
+                        is_leaf=True, samples=len(y))
 
         # Best split
-        split_idx, split_threshold, left_idxs, right_idxs = self._best_split(X, y, n_samples, n_features)
+        split_idx, split_threshold, left_idxs, right_idxs, best_gain = self._best_split(X, y, n_samples, n_features)
         if split_idx is None:
-            return Node(value=majority_class, is_leaf=True)
+            return Node(value=majority_class, is_leaf=True, samples=len(y[right_idxs]), class_distribution=value_distribution)
 
         left_idxs, right_idxs = self._split(X[:, split_idx], split_threshold)
 
         if len(left_idxs) == 0:
             leaf_value = self._most_common_label(y[right_idxs])
-            return Node(value=leaf_value, is_leaf=True)
+            return Node(value=leaf_value, is_leaf=True, samples=len(y[right_idxs]), class_distribution=value_distribution)
         if len(right_idxs) == 0:
             leaf_value = self._most_common_label(y[left_idxs])
-            return Node(value=leaf_value, is_leaf=True)
-    
-        
-        # DEBUGGING
-        # print(f" Recursing left: depth={depth+1}, size={len(y[left_idxs])}")
-        # print(f" Recursing right: depth={depth+1}, size={len(y[right_idxs])}")
+            return Node(value=leaf_value, is_leaf=True, samples=len(y[right_idxs]), class_distribution=value_distribution)
         
         # Recursive growth
         left = self._grow_tree(X[left_idxs, :], y[left_idxs], n_tot_samples, depth + 1)
         right = self._grow_tree(X[right_idxs, :], y[right_idxs], n_tot_samples, depth + 1)
-
+            
         node = Node(
             feat_idx=split_idx,
             threshold=split_threshold,
             left=left,
             right=right,
             value=majority_class,
-            is_leaf=False
+            is_leaf=False,
+            gain=best_gain,
+            samples=len(y),
+            class_distribution=value_distribution
         )
         node.left_weight = len(left_idxs) / (len(left_idxs) + len(right_idxs))
         node.right_weight = len(right_idxs) / (len(left_idxs) + len(right_idxs))
@@ -170,8 +172,6 @@ class DecisionTree:
                     gain = self.mv_handler.weight_split(X_df, y, feat_idx, threshold)
                     # DEBUGGING
                     # print(f"Tested split - Feature {feat_idx} | Threshold: {threshold:.2f} | Gain: {gain:.4f}")
-                    # if feat_idx == 4 or feat_idx == 11 :
-                        # print(f"Tested split - Feature {feat_idx} | Threshold: {threshold:.2f} | Gain: {gain:.4f}")
 
                     if gain <= 0:
                         continue
@@ -262,11 +262,11 @@ class DecisionTree:
             # DEBUGGING
             # print(f"✅ Selected split: Feature {split_idx} | Threshold: {split_threshold} | Gain: {best_gain:.4f}")
             # print(f"Left size: {len(left_idxs)}, Contains classes: {np.unique(y[left_idxs])}// Right size: {len(right_idxs)}, Contains classes: {np.unique(y[right_idxs])}")
-            return split_idx, split_threshold, left_idxs, right_idxs
+            return split_idx, split_threshold, left_idxs, right_idxs, best_gain
 
         # DEBUGGING
         # print("⛔️ No valid split found.")
-        return None, None, None, None
+        return None, None, None, None, None
 
 
 
@@ -308,14 +308,20 @@ class DecisionTree:
 
 
 class Node:
-    def __init__(self, feat_idx=None, threshold=None, left=None, right=None, value=None, is_leaf=False):
+    def __init__(self, feat_idx=None, threshold=None, left=None, right=None, 
+                 value=None, is_leaf=False, leaf_value=None, gain=None,
+                 samples=None, class_distribution=None):
         self.feat_idx = feat_idx
         self.threshold = threshold
         self.left = left
         self.right = right
         self.is_leaf = is_leaf
+        self.value = value
         self.leaf_value = value if is_leaf else None
-        self.majority_class = value  # toujours défini
+        self.majority_class = value  
+        self.gain = gain
+        self.samples = samples
+        self.class_distribution = class_distribution
 
 def print_tree(node, depth=0, prefix=""):
     indent = "|   " * depth
