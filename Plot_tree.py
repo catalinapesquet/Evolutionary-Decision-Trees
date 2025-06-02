@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 Created on Thu May 29 12:04:10 2025
-
 @author: Aurora
 """
 from graphviz import Digraph
+import numpy as np
 import os
 
-def print_tree(node, depth=0, prefix=""):
+def print_tree(node, depth=0):
     indent = "|   " * depth
     if node.is_leaf:
         print(f"{indent}|--- class: {node.leaf_value}")
@@ -18,39 +18,63 @@ def print_tree(node, depth=0, prefix=""):
         print_tree(node.right, depth + 1)
 
 
-def export_tree_dot(node, output_name="decision_tree"):
+def color_brew(n):
+    s, v = 0.75, 0.9
+    c = s * v
+    m = v - c
+    color_list = []
+    for h in np.arange(25, 385, 360.0 / n).astype(int):
+        h_bar = h / 60.0
+        x = c * (1 - abs((h_bar % 2) - 1))
+        rgb = [
+            (c, x, 0), (x, c, 0), (0, c, x), (0, x, c), (x, 0, c), (c, 0, x), (c, x, 0)
+        ]
+        r, g, b = rgb[int(h_bar)]
+        color_list.append([int(255 * (r + m)), int(255 * (g + m)), int(255 * (b + m))])
+    return color_list
 
+
+def get_n_classes(node):
+    classes = set()
+    def traverse(n):
+        if n.value is not None:
+            classes.update(range(len(n.value)))
+        if not n.is_leaf:
+            traverse(n.left)
+            traverse(n.right)
+    traverse(node)
+    return len(classes)
+
+
+def export_tree_dot(node, output_name="decision_tree"):
     dot = Digraph(comment='Decision Tree', format='png')
     dot.attr('node', shape='box', style='filled', fontname="helvetica")
-    
-    def get_color(gain):
-        if gain < 0.6:
-            return "#A2D5AB"  # green
-        elif gain < 1.2:
-            return "#FFCC99"  # orange 
+
+    n_classes = get_n_classes(node)
+    raw_colors = color_brew(n_classes)
+    class_colors = ['#%02x%02x%02x' % tuple(rgb) for rgb in raw_colors]
+
+    def get_color(n):
+        # if n.is_leaf or n.value is None:
+        #     return "#C0C0C0"
+        # else:
+        index = np.argmax(n.value)
+        return class_colors[index]
+
+    def recurse(n):
+        node_id = str(id(n))
+        if n.is_leaf:
+            label = f"class: {n.leaf_value}\nsamples: {n.samples}\nvalue: {n.value}"
         else:
-            return "#FF9999"  # red
-
-    def recurse(node):
-        node_id = str(id(node))
-
-        if node.is_leaf:
-            label = f"class: {node.leaf_value}"
-            color = "#B3E5FC"  
-        else:
-            label = (f"x[{node.feat_idx}] <= {node.threshold:.3f}\n"
-         f"gain: {node.gain:.4f}\nsamples: {node.samples}\nvalue: {node.value}")
-
-            color = get_color(node.gain)
-
+            label = (f"x[{n.feat_idx}] <= {n.threshold:.3f}\n"
+                     f"gain: {n.gain:.4f}\nsamples: {n.samples}\nvalue: {n.value}")
+        color = get_color(n)
         dot.node(node_id, label=label, fillcolor=color)
-
-        if not node.is_leaf:
-            # Ajoute les arêtes avec labels
-            dot.edge(node_id, str(id(node.left)), label="True")
-            dot.edge(node_id, str(id(node.right)), label="False")
-            recurse(node.left)
-            recurse(node.right)
+        if not n.is_leaf:
+            dot.edge(node_id, str(id(n.left)), label="True")
+            dot.edge(node_id, str(id(n.right)), label="False")
+            recurse(n.left)
+            recurse(n.right)
 
     recurse(node)
     output_path = dot.render(output_name, cleanup=True)

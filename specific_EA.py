@@ -28,7 +28,7 @@ import datetime
 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
  
 # PARAMETERS
-dataset="abalone"
+dataset="anneal"
 pop_size = 100
 n_gen = 500
 objectives = ["specificity", "recall", "n_nodes"] 
@@ -44,6 +44,12 @@ X_meta_train, X_meta_test, y_meta_train, y_meta_test = extract_data(dataset)
 
 # DEFINE PROBLEM
 class TreeProblem(ElementwiseProblem):
+    """
+    Define the problem: 
+        objective functions, 
+        population initialization (Random choice)
+    
+    """
     def __init__(self, X_meta_train, y_meta_train, X_meta_test, y_meta_test, objectives):
         self.X_meta_train = X_meta_train
         self.y_meta_train = y_meta_train
@@ -70,6 +76,12 @@ class TreeProblem(ElementwiseProblem):
         super().__init__(vars=vars, n_obj=len(objectives))
         
     def resplit_data(self):
+        """
+
+        Creates a new seed for each generation
+        to have different train and test splits.
+
+        """
         random_seed = np.random.randint(0, 100000)  # New seed
         X_train_new, X_val, y_train_new, y_val = train_test_split(
             self.X_meta_train, self.y_meta_train, test_size=0.3, random_state=random_seed, stratify=self.y_meta_train)
@@ -79,6 +91,14 @@ class TreeProblem(ElementwiseProblem):
         self.y_test = y_val
 
     def _evaluate(self, x, out, *args, **kwargs):
+        """
+
+        Defines and extract objective functions from the metrics function 
+        (recall, f1, specificty, number of nodes).
+        Returns out["F"] a list of all objectives for all individuals in the 
+        generation.
+
+        """
         global n_nodes_min, n_nodes_max, first_gen_bornes_done
         try:
             self.evaluation_counter += 1
@@ -122,7 +142,7 @@ class TreeProblem(ElementwiseProblem):
             elif len(objectives) == 3:
                 out["F"] = [1.0, 999, 1.0]
                 
-
+# Chosen genetic algorithm : NSGA2
 algorithm = NSGA2(pop_size=pop_size,
                   sampling=ChoiceRandomSampling(),
                   crossover=SinglePointCrossover(prob=0.9),
