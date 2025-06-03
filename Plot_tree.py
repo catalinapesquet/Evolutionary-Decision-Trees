@@ -17,22 +17,6 @@ def print_tree(node, depth=0):
         print(f"{indent}|--- feature_{node.feat_idx} >  {node.threshold:.2f}")
         print_tree(node.right, depth + 1)
 
-
-# def color_brew(n):
-#     s, v = 0.75, 0.9
-#     c = s * v
-#     m = v - c
-#     color_list = []
-#     for h in np.arange(25, 385, 360.0 / n).astype(int):
-#         h_bar = h / 60.0
-#         x = c * (1 - abs((h_bar % 2) - 1))
-#         rgb = [
-#             (c, x, 0), (x, c, 0), (0, c, x), (0, x, c), (x, 0, c), (c, 0, x), (c, x, 0)
-#         ]
-#         r, g, b = rgb[int(h_bar)]
-#         color_list.append([int(255 * (r + m)), int(255 * (g + m)), int(255 * (b + m))])
-#     return color_list
-
 def color_brew(n):
     if n <= 0:
         n = 1  # Sécurité : au moins une couleur pour éviter la division par zéro
