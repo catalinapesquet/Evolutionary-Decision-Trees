@@ -163,7 +163,7 @@ n_nodes_min, n_nodes_max = None, None
 res = minimize(problem,
                algorithm,
                termination,
-               seed=42,
+               seed=41,
                verbose=True,
                save_history=True)
 

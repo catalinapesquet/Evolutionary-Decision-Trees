@@ -6,6 +6,17 @@ Created on Fri Mar 28 12:17:19 2025
 """
 import numpy as np
 class StoppingCriterion:
+    """
+    Defines stopping rules for terminating the growth of a decision tree node.
+    
+    Attributes:
+        criterion (str): Name of the stopping strategy (e.g., 'max_depth', 'homogeneity').
+        param (int): Integer value used to configure the stopping behavior, mapped from a gene.
+    
+    Methods:
+        stop(n_tot_samples, y, depth):
+            Checks if the current node satisfies the stopping condition.
+    """
     def __init__(self, n_tot_samples, criterion, param=2):
         self.criterion = criterion
         self.param = param
@@ -42,6 +53,24 @@ class StoppingCriterion:
     
     # Check if stopping criterion is observed
     def stop(self, n_tot_samples, y, depth):
+        """
+        Evaluates whether the tree-growing process should stop at the current node.
+        
+        Depending on the chosen criterion, the method checks:
+        - Homogeneity (only one class present)
+        - Maximum depth reached
+        - Minimum number of samples
+        - Minimum proportion of dataset
+        - Sufficient predictive accuracy of the node
+        
+        Parameters:
+            n_tot_samples (int): Total number of samples in the dataset.
+            y : Labels at the current node.
+            depth (int): Current depth of the node.
+        
+        Returns:
+            bool: True if the stopping condition is met.
+        """
         if self.criterion == 'homogeneity':
             if self.check_homogeneity(y):
                 return True

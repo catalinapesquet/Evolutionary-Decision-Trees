@@ -28,8 +28,8 @@ timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 # PARAMETERS
 dataset_names = ["anneal", "audiology", "car"] # dermatology
 pop_size = 100
-n_gen = 500
-objectives = ["recall", "specificity", "n_nodes"]
+n_gen = 100
+objectives = ["specificity", "recall", "n_nodes"]
 
 algorithm = NSGA2(pop_size=pop_size,
                   sampling=ChoiceRandomSampling(),
