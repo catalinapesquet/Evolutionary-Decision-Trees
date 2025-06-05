@@ -11,7 +11,25 @@ from sklearn.model_selection import train_test_split
 from scipy.stats import norm
 
 class Pruning:
+    """
+    Implements multiple decision tree pruning strategies.
+    
+    The pruning method is selected via `method` and parameterized by `param`.
+    Available methods:
+    - REP: Reduced Error Pruning
+    - PEP: Pessimistic Error Pruning
+    - MEP: Minimum Error Pruning (Bayesian)
+    - CCP: Cost-Complexity Pruning
+    - EBP: Error-Based Pruning with confidence bounds
+    """
     def __init__(self, method=None, param=None):
+        """
+        Initializes the pruning object with a strategy and its parameter.
+        
+        Parameters:
+            method (str): Pruning method identifier (e.g., 'REP', 'PEP', etc.)
+            param (int): Gene-mapped hyperparameter controlling pruning aggressiveness.
+        """
         self.method = method
         self.param = param
         
@@ -68,6 +86,9 @@ class Pruning:
         return np.array(reachable_X), np.array(reachable_y)
     
     def _count_leaves(self, n):
+        """
+        Recursively counts the number of leaf nodes in the subtree rooted at n.
+        """
         if n is None:
             return 0
         if n.is_leaf:
@@ -210,6 +231,11 @@ class Pruning:
     
     # Gene 3: CCP
     def _CCP(self, tree, X, y):
+        """
+        Iteratively generates a pruning sequence by minimizing the 
+        cost-complexity trade-off (error vs. number of leaves).
+        Selects the best pruned subtree on a validation set.
+        """
         val_size = min(max(self.param / 100.0, 0.1), 0.5)
         X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=val_size, stratify=y, random_state=42)
         sequence = self._generate_ccp_sequence(tree, X_train, y_train)
@@ -264,7 +290,10 @@ class Pruning:
     
     # Gene 4: EBP
     def _EBP(self, tree, X, y):
-        """ Error-Based Pruning """
+        """
+        Uses statistical bounds on classification error (based on binomial distribution)
+        to prune nodes that are not significantly better than a single leaf.
+        """
         val_size = min(max(self.param / 100.0, 0.1), 0.5)
         X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=val_size, stratify=y, random_state=42)
 

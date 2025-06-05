@@ -418,82 +418,8 @@ def twoing(y, X_column, threshold):
 
     return twoing_value
 
-# Gene 11: CAIR
-# def cai_after_split(y, X_column, threshold):
-#     left_indices = X_column <= threshold
-#     right_indices = X_column > threshold
-#     # Check if one side is empty 
-#     if len(left_indices) == 0 or len(right_indices) == 0:
-#         return 0  
 
-#     cai_value = information_gain(y, left_indices, right_indices)
-#     return cai_value
-
-# def redundancy_measure(y, X_column, threshold):
-#     left_indices = X_column <= threshold
-#     right_indices = X_column > threshold
-    
-#     left = y[left_indices]
-#     right = y[right_indices]
-
-#     n_y = len(y)
-#     n_left = len(left)
-#     n_right = len(right)
-
-#     if len(left) == 0 or len(right) == 0:
-#         return 0  
-
-#     class_counts_parent = pd.Series(y).value_counts(normalize=True).to_dict()
-#     class_counts_left = pd.Series(left).value_counts(normalize=True).to_dict()
-#     class_counts_right = pd.Series(right).value_counts(normalize=True).to_dict()
-
-#     inconsistency = 0
-#     all_classes = set(class_counts_parent.keys()) | set(class_counts_left.keys()) | set(class_counts_right.keys())
-
-#     for cls in all_classes:
-#         prob_parent = class_counts_parent.get(cls, 0)
-#         prob_left = class_counts_left.get(cls, 0)
-#         prob_right = class_counts_right.get(cls, 0)
-
-#         # Calculer la différence pondérée des probabilités par la taille des partitions
-#         inconsistency += abs(prob_left - prob_parent) * (n_left / n_y) + abs(prob_right - prob_parent) * (n_right / n_y)
-
-#     return inconsistency
-
-# def cair(y, X_column, threshold):
-#     if len(y) != len(X_column):
-#         raise ValueError("y and X_column must have the same length")
-
-#     left_indices = X_column <= threshold
-#     right_indices = X_column > threshold
-
-#     n_total = len(y)
-#     n_left = np.sum(left_indices)
-#     n_right = np.sum(right_indices)
-
-#     if n_left == 0 or n_right == 0:
-#         print("Warning: One split is empty. Returning a large value.") 
-#         return np.inf 
-
-#     gain = information_gain(y, left_indices, right_indices)
-
-#     num_classes = np.max(y) + 1
-#     left_counts = np.bincount(y[left_indices], minlength=num_classes)
-#     right_counts = np.bincount(y[right_indices], minlength=num_classes)
-#     observed = np.vstack([left_counts, right_counts])  
-
-#     total = observed.sum()
-#     expected = np.outer(observed.sum(axis=0), observed.sum(axis=1)) / total
-#     expected = expected.T  # Ajuster pour être aligné avec observed
-
-#     chi2_statistic = np.sum((observed - expected) ** 2 / (expected + 1e-9))
-
-#     conditional_term = chi2_statistic / (2 * n_total)
-
-#     r_ca = gain - conditional_term
-
-#     return r_ca
-
+# Gene 11: Cair
 def cair(y, X_column, threshold):
     # Convert inputs to numpy arrays for easier manipulation
     y = np.array(y)
@@ -560,10 +486,32 @@ def gain_ratio(y, X_column, threshold):
     return gain_ratio_value
 
 class SplitCriterion:
+    """
+    Encapsulates various splitting criteria for decision tree construction.
+    
+    The criterion is selected via a string name (e.g., 'gini', 'information_gain'),
+    and the corresponding method is used to compute split quality.
+    
+    Methods:
+        calculate(y, X_column, threshold):
+            Returns the gain of splitting `X_column` at `threshold` for labels `y`.
+    """
     def __init__(self, criterion='gini'):
         self.criterion = criterion
     
     def calculate(self, y, X_column, threshold):
+        """
+        Dispatches the computation of split quality to the appropriate method,
+        based on the selected criterion.
+        
+        Parameters:
+            y (array-like): Target class labels.
+            X_column (array-like): Feature values for a single feature.
+            threshold (float): Candidate threshold to evaluate the split.
+        
+        Returns:
+            float: The computed gain or score for the proposed split.
+        """
         if self.criterion == 'information_gain':
             return self._information_gain(y, X_column, threshold) 
         elif self.criterion == 'gini':

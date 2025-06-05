@@ -13,7 +13,26 @@ random.seed(42)
 np.random.seed(42)
 
 class MissingValues:
+    """
+    Handles missing values at different stages of decision tree processing:
+    
+    - During split evaluation (mv_split)
+    - During data distribution after a split (mv_distrib)
+    - During classification/prediction (mv_classif)
+    
+    The strategy for each stage is controlled via string parameters, which
+    are typically evolved as genes in an evolutionary algorithm.
+    """
     def __init__(self, mv_split='ignore_all', mv_distrib='ignore_all', mv_classif='explore_all', split_criterion=None):
+        """
+        Initializes the missing value handler with chosen strategies.
+        
+        Parameters:
+            mv_split (str): Strategy to handle missing values during split evaluation.
+            mv_distrib (str): Strategy to handle missing values during data distribution after a split.
+            mv_classif (str): Strategy to handle missing values during classification.
+            split_criterion: Optional reference to the split criterion object for use in 'weight_split'.
+        """
         self.mv_split = mv_split
         self.mv_distrib = mv_distrib
         self.mv_classif = mv_classif
@@ -149,6 +168,11 @@ class MissingValues:
     
     # Gene 0: Ignoring all
     def ignore_all_dis(self, X, y, feature, split_value):
+        """
+        Removes all instances with missing values for the given feature before evaluating split quality.
+        
+        Used when the strategy is to fully ignore missing data during split computation.
+        """
         feature = self._standardize_feature_name(feature)
         # Filter out instances with missing values in the feature
         mask = X[feature].notnull()
@@ -417,22 +441,4 @@ class MissingValues:
                 node = node.right
         
         return node.leaf_value if node.is_leaf else node.majority_class
-    
-    # # Gene 2: Assign to majority class of node 
-    # def _predict_stop_and_vote(self, inputs, node):
-    #     """
-    #     Halt the classification process and assign the instance to the majority class of node
-    #     """
-    #     val = inputs[node.feat_idx]
-    #     # Check if val is an array and handle it accordingly
-    #     if isinstance(val, np.ndarray):
-    #         if np.isnan(val).any():
-    #             return node.majority_class # Halt and return the majority class of the current node
-    #     elif np.isnan(val):
-    #         return node.majority_class  # Halt and return the majority class of the current node
-    #     elif val <= node.threshold:
-    #         return self._predict_stop_and_vote(inputs, node.left)  # Traverse left
-    #     else:
-    #         return self._predict_stop_and_vote(inputs, node.right)  # Traverse right
-
     
