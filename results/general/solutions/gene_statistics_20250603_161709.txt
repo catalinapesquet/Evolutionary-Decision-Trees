@@ -1,0 +1,56 @@
+Splitting criteria:
+1: 33 times
+4: 31 times
+6: 2 times
+7: 10 times
+11: 10 times
+12: 14 times
+
+Stopping criteria:
+0: 9 times
+1: 84 times
+2: 2 times
+3: 5 times
+
+Stopping parameter:
+0: 10 times
+2: 3 times
+4: 3 times
+5: 19 times
+21: 4 times
+30: 27 times
+40: 2 times
+41: 24 times
+78: 6 times
+86: 2 times
+
+Mv Split:
+0: 37 times
+1: 4 times
+2: 55 times
+3: 4 times
+
+Mv_Distrib:
+1: 7 times
+2: 11 times
+3: 13 times
+4: 16 times
+5: 42 times
+6: 11 times
+
+Mv Class:
+0: 67 times
+1: 33 times
+
+Pruning:
+4: 11 times
+5: 89 times
+
+Pruning param:
+1: 31 times
+2: 19 times
+3: 9 times
+7: 17 times
+10: 20 times
+24: 4 times
+
