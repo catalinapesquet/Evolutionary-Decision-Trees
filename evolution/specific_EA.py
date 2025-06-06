@@ -28,7 +28,7 @@ import datetime
 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
  
 # PARAMETERS
-dataset="car"
+dataset="semeion"
 pop_size = 100
 n_gen = 500
 objectives = ["specificity", "recall", "n_nodes"] 
@@ -45,12 +45,21 @@ X_meta_train, X_meta_test, y_meta_train, y_meta_test = extract_data(dataset)
 # DEFINE PROBLEM
 class TreeProblem(ElementwiseProblem):
     """
-    Define the problem: 
-        objective functions, 
-        population initialization (Random choice)
-    
+    Defines the evolutionary optimization problem for decision trees.
+
+    - Uses gene-encoded individuals to represent tree configurations.
+    - Evaluates individuals based on multiple objectives (e.g., recall, specificity, tree size).
+    - Automatically resplits training/test data each generation to improve generalization.
     """
+    
     def __init__(self, X_meta_train, y_meta_train, X_meta_test, y_meta_test, objectives):
+        """
+        Initializes the problem, variables (genes), and dataset splits.
+        
+        Variables include:
+        - Gene 0–7: encoding of criteria, pruning, MV strategies, etc.
+        - Objectives: recall, specificity, n_nodes (tree size), etc.
+        """
         self.X_meta_train = X_meta_train
         self.y_meta_train = y_meta_train
         self.X_meta_test = X_meta_test

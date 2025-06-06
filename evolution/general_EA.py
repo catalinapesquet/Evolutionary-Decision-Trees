@@ -26,7 +26,7 @@ from collections import Counter
 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
 # PARAMETERS
-dataset_names = ["anneal", "audiology", "car"] # dermatology
+dataset_names = ["winequality-red", "car", "segment"] # dermatology
 pop_size = 100
 n_gen = 100
 objectives = ["specificity", "recall", "n_nodes"]
@@ -58,6 +58,15 @@ class MultiDatasetProblem(ElementwiseProblem):
         super().__init__(vars=vars, n_obj=len(objectives))
     
     def _evaluate(self, x, out, *args, **kwargs):
+        """
+        Evaluates one individual (tree configuration) by:
+        1. Decoding the genotype.
+        2. Training and evaluating the tree on each dataset.
+        3. Averaging the objective values (recall, specificity, n_nodes).
+        4. Inverting metrics (1 - value) to allow minimization.
+        
+        On failure, assigns penalty values.
+        """
         try:
             # Decode tree from genotype
             # print("Evaluating x :", x.tolist())
